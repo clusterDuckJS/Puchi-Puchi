@@ -13,7 +13,7 @@
   interpolate-size: allow-keywords;
 
   --color-primary: #f28c9d;
-  --color-primary-light: #ffbb6e;
+  --color-primary-light: rgb(242 140 157 / 10%);
   --color-primary-light-50: #fef3e8;
   --color-text-light: #111827;
   --color-success: #16a34a;
@@ -41,7 +41,7 @@ li {
 /* end---------------CSS resets---------------end */
 
 section {
-  padding: 6rem 10rem;
+  padding: 6rem 18rem;
 }
 
 
@@ -183,8 +183,15 @@ li {
   max-width: 65ch;
 }
 
-.bold {
+.bold-600 {
   font-weight: 600;
+}
+
+.bold-700 {
+  font-weight: 700;
+}
+.bold-800 {
+  font-weight: 800;
 }
 
 .italic {
@@ -241,7 +248,7 @@ details {
 }
 
 button {
-  padding: 0.4rem 2rem;
+  padding: 1rem 2rem;
   border: none;
   display: flex;
   align-items: center;
@@ -249,7 +256,7 @@ button {
   gap: 0.5rem;
   white-space: nowrap;
   font-weight: 500;
-  border-radius: 0.3rem;
+  border-radius: 5rem;
 
   &.primary {
     background-color: var(--color-primary);
@@ -286,10 +293,11 @@ button {
 
 /* =========================================CARD========================================= */
 .card {
-  padding: 3rem;
+  padding: 1.5rem;
+  background-color: #fffcfa;
   border: 1px solid var(--color-primary-light);
-  border-radius: 0.5rem;
-  box-shadow: rgba(149, 157, 165, 0.2) 0px 8px 24px;
+  border-radius: 1.5rem;
+  box-shadow: 0 8px 30px -8px hsl(350 80% 75% / .12);
 }
 
 /* =========================================END----CARD----END========================================= */
@@ -299,8 +307,8 @@ button {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 1.5rem;
-  background-color: var(--color-primary-light-50);
+  padding: 1.2rem;
+  background-color: hsl(350 80% 75% / .1);
   font-size: 2rem;
   color: var(--color-primary);
   border-radius: 50%;
@@ -329,9 +337,14 @@ button {
   flex: 1;
 }
 
-.flex-column {
+.flex-col {
   display: flex;
   flex-direction: column;
+}
+
+.grid-col-3 {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0px, 1fr));
 }
 
 .justify-center {
@@ -376,6 +389,12 @@ button {
 
 .gap-2 {
   gap: 2rem;
+}
+.gap-3 {
+  gap: 3rem;
+}
+.gap-4 {
+  gap: 4rem;
 }
 
 /* ========================================END----FLEX----END======================================== */

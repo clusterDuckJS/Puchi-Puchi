@@ -1,0 +1,7 @@
+section.hero{
+    .gradient-text{
+    background-clip: text;
+    color: transparent;
+    background-image: linear-gradient(135deg, #ed5e76, #ff9f80);
+    }
+}
