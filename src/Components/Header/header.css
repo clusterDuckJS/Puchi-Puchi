@@ -4,7 +4,7 @@ header{
     background-color: rgb(255 245 247 / 80%);
     backdrop-filter: blur(10px);
     z-index: 100;
-    padding: 1rem 18rem;
+    padding: 1rem 12rem;
     border-bottom: 1px solid #f3e2e5;
     img{
         height: 3rem;

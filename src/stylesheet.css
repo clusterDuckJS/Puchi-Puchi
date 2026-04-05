@@ -12,7 +12,7 @@
   -moz-osx-font-smoothing: grayscale;
   interpolate-size: allow-keywords;
 
-  --color-primary: #f28c9d;
+  --color-primary: #dd5f89;
   --color-primary-light: rgb(242 140 157 / 10%);
   --color-primary-light-50: #fef3e8;
   --color-text-light: #111827;
@@ -41,7 +41,7 @@ li {
 /* end---------------CSS resets---------------end */
 
 section {
-  padding: 6rem 18rem;
+  padding: 6rem 12rem;
 }
 
 
@@ -108,6 +108,10 @@ section {
 
 .center {
   text-align: center;
+}
+
+.right {
+  text-align: right;
 }
 
 .bg-primary {
@@ -190,6 +194,7 @@ li {
 .bold-700 {
   font-weight: 700;
 }
+
 .bold-800 {
   font-weight: 800;
 }
@@ -204,9 +209,10 @@ li {
 input,
 select,
 textarea {
-  padding: 0.7rem 0.9rem;
+  padding: 0.5rem 0.75rem;
   border: 1px solid var(--color-primary-light);
-  border-radius: 0.5rem;
+  border-radius: 5rem;
+  background: hsl(340 100% 98%);
 
   &:hover {
     border-color: var(--color-primary);
@@ -223,13 +229,26 @@ textarea {
   }
 
   &::placeholder {
-    color: var(--color-text-light);
+    color: hsl(340 18% 48%);
+    font-size: 0.9rem;
   }
 
   &:focus-visible {
     outline: none;
     border: 1px solid var(--color-primary);
   }
+}
+
+label{
+  font-size: clamp(13px, calc(13px + 0.1136vw), 14px);
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+
+fieldset {
+  border: none;
+  padding: 0;
+  margin: 0;
 }
 
 /* ============================END----INPUTS----END=========================== */
@@ -263,7 +282,7 @@ button {
     color: white;
 
     &.sm {
-      padding: 0.4rem 0.5rem;
+      padding: 0.4rem 1rem;
     }
   }
 
@@ -279,7 +298,7 @@ button {
   }
 
   &.sm {
-    padding: 0.4rem 0.5rem;
+    padding: 0.4rem 1rem;
   }
 
   &:disabled {
@@ -326,6 +345,16 @@ button {
   }
 }
 
+.img-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.br-15 {
+  border-radius: 1.5rem;
+}
+
 /* =================================END----ICONS----END================================= */
 
 /* ========================================FLEX======================================== */
@@ -342,10 +371,16 @@ button {
   flex-direction: column;
 }
 
+.grid-col-2 {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0px, 1fr));
+}
+
 .grid-col-3 {
   display: grid;
   grid-template-columns: repeat(3, minmax(0px, 1fr));
 }
+
 
 .justify-center {
   justify-content: center;
@@ -390,11 +425,17 @@ button {
 .gap-2 {
   gap: 2rem;
 }
+
 .gap-3 {
   gap: 3rem;
 }
+
 .gap-4 {
   gap: 4rem;
+}
+
+.w-100 {
+  width: 100%;
 }
 
 /* ========================================END----FLEX----END======================================== */

@@ -9,17 +9,17 @@ const Section = ({
   children,
 }) => {
   return (
-    <section className={sectionClass}>
+    <section className={`${sectionClass} flex-col align-center`}>
       
       {tag && (
-        <small className='tag color-primary bold-600'>
+        <small className='tag color-primary bold-600 center'>
           {tag}
         </small>
       )}
 
-      {title && <h2 className='bold-800'>{title}</h2>}
+      {title && <h2 className='bold-800 center'>{title}</h2>}
 
-      {description && <p>{description}</p>}
+      {description && <p className='center'>{description}</p>}
 
       <div className="children">
         {children}

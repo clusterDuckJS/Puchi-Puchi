@@ -1,0 +1,17 @@
+.product-card.card {
+    .product-image{
+        width: 100%;
+        max-width: 350px;
+        border-radius: 0.5rem;
+    }
+    button{
+        width: 100%;
+        background-color: #FDF5ED;
+        color: hsl(340 30% 28%);
+        border: 2px solid hsl(340 65% 62% / .2);
+        padding: 0.5rem 2rem ;
+        font-size: 14px;
+        font-weight: 600;
+    }
+
+}
