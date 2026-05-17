@@ -2,6 +2,7 @@ import React from 'react'
 import './section.css'
 
 const Section = ({
+  id,
   sectionClass = "",
   tag,
   title,
@@ -9,7 +10,7 @@ const Section = ({
   children,
 }) => {
   return (
-    <section className={`${sectionClass} flex-col align-center`}>
+    <section id={id} className={`${sectionClass} flex-col align-center`}>
       
       {tag && (
         <small className='tag color-primary bold-600 center'>

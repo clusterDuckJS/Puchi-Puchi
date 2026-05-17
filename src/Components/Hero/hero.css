@@ -1,7 +1,147 @@
-section.hero{
-    .gradient-text{
-    background-clip: text;
-    color: transparent;
-    background-image: linear-gradient(135deg, #ed5e76, #ff9f80);
+section.hero {
+    display: grid;
+    grid-template-columns: minmax(280px, 0.82fr) minmax(320px, 1fr);
+    align-items: center;
+    min-height: calc(100vh - 5rem);
+    padding: 4.9rem 17.5vw 7.4rem;
+    overflow: hidden;
+    background:
+        radial-gradient(circle at 68% 46%, rgb(252 194 217 / 42%) 0 10rem, transparent 19rem),
+        linear-gradient(180deg, #fff6f8 0%, #fffafa 74%, #fff5f7 100%);
+
+    .tag {
+        display: inline-flex;
+        align-items: center;
+        width: fit-content;
+        padding: 0.42rem 1.05rem;
+        background-color: rgb(252 218 230 / 72%);
+        color: var(--color-primary);
+        font-size: 0.86rem;
+    }
+
+    .gradient-text {
+        display: block;
+        background-clip: text;
+        color: transparent;
+        background-image: linear-gradient(135deg, #d92864, #ff7560);
+    }
+}
+
+.hero-copy {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1.35rem;
+    max-width: 31rem;
+}
+
+.hero-copy h1 {
+    color: #4a2932;
+    font-size: clamp(3rem, 3.5vw, 4.2rem);
+    letter-spacing: 0;
+    line-height: 0.98;
+}
+
+.hero-copy p {
+    color: #9a6b78;
+    font-size: 1.18rem;
+    line-height: 1.45;
+}
+
+.hero-actions {
+    margin-top: 0.8rem;
+    gap: 1rem;
+}
+
+.hero-actions button {
+    min-height: 3.5rem;
+    padding: 0.95rem 1.95rem;
+    font-weight: 800;
+}
+
+.hero-actions .primary {
+    background: var(--color-primary);
+    box-shadow: 0 16px 34px rgb(221 95 137 / 24%);
+}
+
+.hero-actions .primary:hover {
+    background: #d84f7d;
+}
+
+.hero-actions .secondary {
+    border: 2px solid #f3bfd0;
+    color: #4a2932;
+    background: rgb(255 255 255 / 40%);
+}
+
+.hero-actions .secondary:hover {
+    border-color: var(--color-primary);
+    color: var(--color-primary);
+}
+
+.hero-mark {
+    display: flex;
+    flex-direction: column;
+    justify-self: center;
+    gap: 2.6rem;
+    color: #c91558;
+    font-family: "Yu Mincho", "Hiragino Mincho ProN", "Noto Serif JP", serif;
+    font-size: clamp(6rem, 9vw, 12rem);
+    font-weight: 900;
+    line-height: 0.72;
+    letter-spacing: 0;
+    text-shadow: 0 24px 70px rgb(201 21 88 / 18%);
+}
+
+.hero-mark span {
+    display: block;
+}
+
+@media screen and (max-width: 1024px) {
+    section.hero {
+        grid-template-columns: 1fr;
+        min-height: auto;
+        padding: 5rem 4rem;
+        gap: 4rem;
+    }
+
+    .hero-mark {
+        justify-self: start;
+        font-size: clamp(5rem, 18vw, 9rem);
+    }
+}
+
+@media screen and (max-width: 768px) {
+    section.hero {
+        padding: 4rem 1rem 5rem;
+        gap: 3rem;
+    }
+
+    .hero-copy {
+        max-width: 100%;
+    }
+
+    .hero-copy h1 {
+        font-size: clamp(2.65rem, 13vw, 3.5rem);
+    }
+
+    .hero-copy p {
+        font-size: 1.03rem;
+    }
+
+    .hero-actions {
+        flex-direction: column;
+        align-items: stretch;
+        width: 100%;
+    }
+
+    .hero-actions button {
+        width: 100%;
+    }
+}
+
+@media screen and (max-width: 767px) {
+    .hero-mark {
+        display: none;
     }
 }

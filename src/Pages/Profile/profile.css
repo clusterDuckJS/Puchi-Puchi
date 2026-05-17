@@ -1,0 +1,36 @@
+.profile {
+  padding: 3rem 12rem;
+}
+
+.profile .details-container {
+  gap: 2rem;
+  margin-top: 2rem;
+}
+
+.profile-summary,
+.profile-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.profile-error {
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+@media screen and (max-width: 1024px) {
+  .profile {
+    padding: 3rem 4rem;
+  }
+}
+
+@media screen and (max-width: 768px) {
+  .profile {
+    padding: 3rem 1rem;
+  }
+
+  .profile .details-container {
+    grid-template-columns: 1fr;
+  }
+}

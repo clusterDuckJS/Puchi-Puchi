@@ -1,16 +1,15 @@
-import React, { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import './home.css'
 import Hero from '../../Components/Hero/Hero'
 import Section from '../../Components/Section/Section'
-import { LuBox, LuCamera, LuWandSparkles } from 'react-icons/lu'
+import { LuArrowRight, LuBox, LuCamera, LuCheck, LuWandSparkles } from 'react-icons/lu'
 import ProductCard from '../../Components/ProductCard/ProductCard'
 import { supabase } from '../../utils/supabase.js'
 import { useNavigate } from 'react-router-dom'
 
 function Home() {
-  console.log(supabase);
-  const navigate = useNavigate();
-  const [products, setProducts] = useState([]);
+  const navigate = useNavigate()
+  const [products, setProducts] = useState([])
 
   useEffect(() => {
     const fetchProducts = async () => {
@@ -29,87 +28,102 @@ function Home() {
             image_url
           )
         `)
-        .eq("is_active", true);
+        .eq("is_active", true)
 
       if (error) {
-        console.error("Error fetching:", error);
+        console.error("Error fetching:", error)
       } else {
-        console.log("DATA:", data); // debug
-        setProducts(data);
+        setProducts(data)
       }
-    };
+    }
 
-    fetchProducts();
-  }, []);
+    fetchProducts()
+  }, [])
+
+  const newArrivals = products.slice(0, 3)
+  const bestSellers = products.length > 3 ? products.slice(3, 6) : products.slice(0, 3)
+
   return (
-    <div>
+    <div className='container home'>
       <Hero />
 
-      {/* NEW ARRIVALS */}
       <Section
-        tag="🌸 Just Dropped"
-        title="New Arrivals"
-        description="Fresh off the crafting table, meet our newest cuties!">
-        <div className="card-container grid-col-3 gap-2">
-          {products.map(product => (
-            <ProductCard
-              key={product.id}
-              product={product}
-              onClick={(p) => navigate(`/product/${p.id}`)}
-            />
-          ))}
-        </div>
-      </Section>
-      {/* END--------NEW ARRIVALS--------END */}
-
-      {/* BEST SELLERS */}
-      <Section
-        tag="⭐ Best Sellers"
-        title="Our Cutest Figurines"
-        description="Discover our most loved chibi characters, ready to find a new home!">
-        <div className="card-container grid-col-3 gap-2">
-          {products.map(product => (
-            <ProductCard
-              key={product.id}
-              product={product}
-              onClick={(p) => navigate(`/product/${p.id}`)}
-            />
-          ))}
-        </div>
-      </Section>
-      {/* END--------BEST SELLERS--------END */}
-
-      {/* HOW IT WORKS */}
-      <Section
+        id="custom-chibi"
+        sectionClass="home-section how-section"
         tag="🎀 Simple & Fun"
         title="How It Works"
         description="Getting your own chibi is as easy as 1-2-3!">
-        <div className="card-container grid-col-3 gap-2">
-          <div className="card flex-col align-center gap-1">
-            <div className="svg-wrapper">
+        <div className="card-container steps-grid">
+          <div className="card step-card">
+            <div className="step-icon">
               <LuCamera />
+              <span>1</span>
             </div>
             <h5 className='bold-700 center'>Upload Your Photo</h5>
-            <p className='center'>Easily upload your photo and place your order in just a few clicks</p>
+            <p className='center'>Easily upload your photo and place your order in just a few clicks.</p>
           </div>
-          <div className="card flex-col align-center gap-1">
-            <div className="svg-wrapper">
+
+          <div className="card step-card">
+            <div className="step-icon">
               <LuWandSparkles />
+              <span>2</span>
             </div>
             <h5 className='bold-700 center'>Preview & Approve</h5>
-            <p className='center'>We create your custom design and send a preview on WhatsApp. Request changes until you love it. 100% satisfaction before we start making it.</p>
+            <p className='center'>We create your custom design and send a preview on WhatsApp. Request changes until you love it.</p>
           </div>
-          <div className="card flex-col align-center gap-1">
-            <div className="svg-wrapper">
+
+          <div className="card step-card">
+            <div className="step-icon">
               <LuBox />
+              <span>3</span>
             </div>
             <h5 className='bold-700 center'>We Craft & Ship</h5>
-            <p className='center'>Once approved, we handcraft your figurine and dispatch it within 5–7 working days.</p>
+            <p className='center'>Once approved, we handcraft your figurine and dispatch it within 5-7 working days.</p>
           </div>
         </div>
-      </Section>
-      {/* END--------HOW IT WORKS--------END */}
 
+        <div className="promise-strip">
+          <span><LuCheck /> Free revisions included</span>
+          <span><LuCheck /> Preview before production</span>
+          <span><LuCheck /> Handmade with care</span>
+        </div>
+      </Section>
+
+      <Section
+        sectionClass="home-section product-section"
+        tag="🌸 Just Dropped"
+        title="New Arrivals"
+        description="Fresh off the crafting table, meet our newest cuties!">
+        <div className="card-container product-grid">
+          {newArrivals.map(product => (
+            <ProductCard
+              key={product.id}
+              product={product}
+              onClick={(p) => navigate(`/product/${p.id}`)}
+            />
+          ))}
+        </div>
+      </Section>
+
+      <Section
+        sectionClass="home-section product-section best-seller-section"
+        tag="⭐ Best Sellers"
+        title="Our Cutest Figurines"
+        description="Discover our most loved chibi characters, ready to find a new home!">
+        <div className="card-container product-grid">
+          {bestSellers.map(product => (
+            <ProductCard
+              key={product.id}
+              product={product}
+              onClick={(p) => navigate(`/product/${p.id}`)}
+            />
+          ))}
+        </div>
+
+        <button className="view-all-btn" type="button" onClick={() => navigate("/shop")}>
+          View All Products <LuArrowRight />
+        </button>
+      </Section>
     </div>
   )
 }
