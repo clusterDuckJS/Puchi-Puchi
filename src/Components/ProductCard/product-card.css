@@ -49,18 +49,23 @@
     font-size: 1.22rem;
 }
 
-.product-card button {
+.product-card button,
+.product-card-link {
     width: 100%;
     margin-top: 0.55rem;
     padding: 0.72rem 2rem;
     border: 2px solid #f1d8df;
+    border-radius: 5rem;
     background-color: #fff8f4;
     color: #4f313b;
     font-size: 0.9rem;
     font-weight: 700;
+    text-align: center;
+    text-decoration: none;
 }
 
-.product-card button:hover {
+.product-card button:hover,
+.product-card-link:hover {
     border-color: var(--color-primary);
     color: var(--color-primary);
 }

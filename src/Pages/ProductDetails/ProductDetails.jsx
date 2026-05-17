@@ -1,97 +1,233 @@
-import React, { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import './product-details.css'
-import { NavLink, useParams } from 'react-router-dom';
-import { LuArrowLeft } from 'react-icons/lu';
-import { supabase } from '../../utils/supabase';
+import { NavLink, useNavigate, useParams } from 'react-router-dom'
+import { LuArrowLeft, LuHeart, LuMinus, LuPlus, LuShoppingBag } from 'react-icons/lu'
+import { supabase } from '../../utils/supabase'
+import ProductCard from '../../Components/ProductCard/ProductCard'
 
 function ProductDetails() {
-  const { id } = useParams();
-  const [product, setProduct] = useState(null);
+  const { id } = useParams()
+  const navigate = useNavigate()
+  const [product, setProduct] = useState(null)
+  const [relatedProducts, setRelatedProducts] = useState([])
+  const [quantity, setQuantity] = useState(1)
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    let isCurrent = true
+
     const fetchProduct = async () => {
-      const { data, error } = await supabase
-        .from("products")
-        .select(`
-          id,
-          name,
-          description,
-          category,
-          product_variants (
+      if (!id) {
+        setProduct(false)
+        setLoading(false)
+        return
+      }
+
+      setLoading(true)
+      setProduct(null)
+
+      try {
+        const { data, error } = await supabase
+          .from("products")
+          .select(`
             id,
             name,
-            price,
-            discount_price,
-            image_url
-          )
-        `)
-        .eq("id", id)
-        .single();
+            description,
+            category,
+            product_variants (
+              id,
+              name,
+              price,
+              discount_price,
+              image_url
+            )
+          `)
+          .eq("id", id)
+          .single()
 
-      if (error) {
-        console.error(error);
-      } else {
-        setProduct(data);
+        if (!isCurrent) return
+
+        if (error) {
+          console.error(error)
+          setProduct(false)
+        } else {
+          setProduct(data)
+        }
+      } catch (error) {
+        if (isCurrent) {
+          console.error(error)
+          setProduct(false)
+        }
+      } finally {
+        if (isCurrent) {
+          setLoading(false)
+        }
       }
-    };
+    }
 
+    fetchProduct()
 
+    return () => {
+      isCurrent = false
+    }
+  }, [id])
 
-    fetchProduct();
-  }, [id]);
+  useEffect(() => {
+    let isCurrent = true
 
-  if (product === null) return <p>Loading...</p>;
-  if (!product) return <p>Product not found</p>;
-  const variant = product.product_variants?.[0];
+    const fetchRelatedProducts = async () => {
+      try {
+        const { data, error } = await supabase
+          .from("products")
+          .select(`
+            id,
+            name,
+            category,
+            is_active,
+            product_variants (
+              id,
+              name,
+              price,
+              discount_price,
+              image_url
+            )
+          `)
+          .eq("is_active", true)
+          .neq("id", id)
+          .limit(3)
 
-  const price = variant?.discount_price || variant?.price;
+        if (!isCurrent) return
 
-  const formattedPrice = `₹${(price / 100).toLocaleString()}`;
+        if (error) {
+          console.error("Related products error:", error)
+        } else {
+          setRelatedProducts(data || [])
+        }
+      } catch (error) {
+        if (isCurrent) {
+          console.error("Related products error:", error)
+        }
+      }
+    }
 
-  const image =
-    variant?.image_url || "https://via.placeholder.com/300";
+    setRelatedProducts([])
+    fetchRelatedProducts()
+
+    return () => {
+      isCurrent = false
+    }
+  }, [id])
+
+  if (loading) {
+    return (
+      <section className="product-details-section">
+        <p className="product-status">Loading...</p>
+      </section>
+    )
+  }
+
+  if (!product) {
+    return (
+      <section className="product-details-section">
+        <NavLink to="/shop" className="product-back-link">
+          <LuArrowLeft /> Back to Shop
+        </NavLink>
+        <p className="product-status">Product not found</p>
+      </section>
+    )
+  }
+
+  const variant = product.product_variants?.[0]
+  const price = variant?.discount_price || variant?.price || 0
+  const formattedPrice = `₹${(price / 100).toLocaleString("en-IN")}`
+  const image = variant?.image_url || "https://via.placeholder.com/600"
+
+  const details = [
+    variant?.name && `Variant: ${variant.name}`,
+    product.category && `Series: ${product.category}`,
+    "Hand-painted details",
+    "Includes careful gift-ready packaging",
+  ].filter(Boolean)
+
   return (
-    <div>
-      <section>
-        <NavLink to="/shop" className="flex align-center gap-05"><LuArrowLeft /> Back to Shop</NavLink>
-        <div className="grid-col-2 gap-2">
-          <div className="card img-wrapper">
-            <img
-              src={image}
-              alt={product.name}
-              className="product-image br-15"
-            />
+    <div className="product-details-page">
+      <section className="product-details-section">
+        <NavLink to="/shop" className="product-back-link">
+          <LuArrowLeft /> Back to Shop
+        </NavLink>
+
+        <div className="product-detail-grid">
+          <div className="product-visual-card">
+            <img src={image} alt={product.name} className="product-detail-image" />
           </div>
-          <div className="product-details">
-            {/* Category */}
-            <small className="text-primary">
-              {product.category}
-            </small>
-            {/* Name */}
-            <h2>{product.name}</h2>
-            {/* Price */}
-            <h3 className="text-primary">
-              {formattedPrice}
-            </h3>
-            {/* Description */}
-            <p>
+
+          <div className="product-info-panel">
+            {product.category && (
+              <small className="product-category">{product.category}</small>
+            )}
+
+            <h1>{product.name}</h1>
+            <h3>{formattedPrice}</h3>
+
+            <p className="product-description">
               {product.description || "No description available"}
             </p>
-            {/* Quantity (basic UI) */}
-            <div className="flex align-center gap-1 mt-1">
-              <span>Quantity:</span>
-              <button>-</button>
-              <span>1</span>
-              <button>+</button>
-            </div>
-            {/* CTA */}
-            <button className="primary mt-2">
-              Add to Cart
-            </button>
-          </div>
 
-          <p>Product ID: {id}</p>
+            <div className="detail-card">
+              <h6>Details</h6>
+              <ul>
+                {details.map((detail) => (
+                  <li key={detail}>{detail}</li>
+                ))}
+              </ul>
+            </div>
+
+            <div className="quantity-row">
+              <span>Quantity:</span>
+              <div className="quantity-stepper" aria-label="Quantity selector">
+                <button
+                  type="button"
+                  aria-label="Decrease quantity"
+                  onClick={() => setQuantity((current) => Math.max(1, current - 1))}
+                >
+                  <LuMinus />
+                </button>
+                <strong>{quantity}</strong>
+                <button
+                  type="button"
+                  aria-label="Increase quantity"
+                  onClick={() => setQuantity((current) => current + 1)}
+                >
+                  <LuPlus />
+                </button>
+              </div>
+            </div>
+
+            <div className="product-action-row">
+              <button className="primary add-cart-button" type="button">
+                <LuShoppingBag /> Add to Cart
+              </button>
+              <button className="wishlist-button" type="button" aria-label="Add to wishlist">
+                <LuHeart />
+              </button>
+            </div>
+          </div>
         </div>
+
+        {relatedProducts.length > 0 && (
+          <div className="related-products">
+            <h3>You Might Also Like</h3>
+            <div className="related-products-grid">
+              {relatedProducts.map((item) => (
+                <ProductCard
+                  key={item.id}
+                  product={item}
+                  onClick={(selectedProduct) => navigate(`/product/${selectedProduct.id}`)}
+                />
+              ))}
+            </div>
+          </div>
+        )}
       </section>
     </div>
   )
