@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
 import './product-details.css'
 import { NavLink, useNavigate, useParams } from 'react-router-dom'
-import { LuArrowLeft, LuHeart, LuMinus, LuPlus, LuShoppingBag } from 'react-icons/lu'
+import { LuArrowLeft, LuHeart, LuMinus, LuPlus, LuSearch, LuShoppingBag } from 'react-icons/lu'
 import { supabase } from '../../utils/supabase'
 import ProductCard from '../../Components/ProductCard/ProductCard'
+import { addItemToCart, getCurrentUserId } from '../../utils/cart'
 
 function ProductDetails() {
   const { id } = useParams()
@@ -11,7 +12,12 @@ function ProductDetails() {
   const [product, setProduct] = useState(null)
   const [relatedProducts, setRelatedProducts] = useState([])
   const [quantity, setQuantity] = useState(1)
+  const [selectedVariantId, setSelectedVariantId] = useState(null)
+  const [variantSearch, setVariantSearch] = useState("")
   const [loading, setLoading] = useState(true)
+  const [isAddingToCart, setIsAddingToCart] = useState(false)
+  const [cartMessage, setCartMessage] = useState("")
+  const [cartError, setCartError] = useState("")
 
   useEffect(() => {
     let isCurrent = true
@@ -39,7 +45,9 @@ function ProductDetails() {
               name,
               price,
               discount_price,
-              image_url
+              image_url,
+              stock,
+              is_active
             )
           `)
           .eq("id", id)
@@ -71,6 +79,15 @@ function ProductDetails() {
       isCurrent = false
     }
   }, [id])
+
+  useEffect(() => {
+    const variants = product?.product_variants || []
+    const firstAvailableVariant = variants.find((variant) => variant.is_active !== false) || variants[0]
+
+    setSelectedVariantId(firstAvailableVariant?.id || null)
+    setVariantSearch("")
+    setQuantity(1)
+  }, [product])
 
   useEffect(() => {
     let isCurrent = true
@@ -137,9 +154,22 @@ function ProductDetails() {
     )
   }
 
-  const variant = product.product_variants?.[0]
+  const variants = (product.product_variants || []).filter((item) => item.is_active !== false)
+  const variantSearchTerm = variantSearch.trim().toLowerCase()
+  const filteredVariants = variantSearchTerm
+    ? variants.filter((item) => {
+      const searchableText = [
+        item.name,
+        item.price && `${(item.price / 100).toLocaleString("en-IN")}`,
+        item.discount_price && `${(item.discount_price / 100).toLocaleString("en-IN")}`,
+      ].filter(Boolean).join(" ").toLowerCase()
+
+      return searchableText.includes(variantSearchTerm)
+    })
+    : variants
+  const variant = variants.find((item) => item.id === selectedVariantId) || variants[0] || product.product_variants?.[0]
   const price = variant?.discount_price || variant?.price || 0
-  const formattedPrice = `₹${(price / 100).toLocaleString("en-IN")}`
+  const formattedPrice = `\u20b9${(price / 100).toLocaleString("en-IN")}`
   const image = variant?.image_url || "https://via.placeholder.com/600"
 
   const details = [
@@ -148,6 +178,42 @@ function ProductDetails() {
     "Hand-painted details",
     "Includes careful gift-ready packaging",
   ].filter(Boolean)
+
+  const handleAddToCart = async () => {
+    setCartMessage("")
+    setCartError("")
+
+    if (!variant?.id) {
+      setCartError("Please choose an available variant.")
+      return
+    }
+
+    setIsAddingToCart(true)
+
+    try {
+      const userId = await getCurrentUserId()
+
+      if (!userId) {
+        navigate("/profile")
+        return
+      }
+
+      await addItemToCart({
+        userId,
+        productId: product.id,
+        variantId: variant.id,
+        quantity,
+        price,
+      })
+
+      setCartMessage("Added to cart.")
+    } catch (error) {
+      console.error("Add to cart error:", error)
+      setCartError(error.message || "We could not add this item to your cart.")
+    } finally {
+      setIsAddingToCart(false)
+    }
+  }
 
   return (
     <div className="product-details-page">
@@ -172,6 +238,52 @@ function ProductDetails() {
             <p className="product-description">
               {product.description || "No description available"}
             </p>
+
+            {variants.length > 1 && (
+              <div className="variant-picker">
+                <div className="variant-picker-heading">
+                  <span>Choose Variant</span>
+                  <small>{variants.length} available</small>
+                </div>
+
+                <label className="variant-search" htmlFor="variantSearch">
+                  <LuSearch aria-hidden="true" />
+                  <input
+                    id="variantSearch"
+                    type="search"
+                    value={variantSearch}
+                    onChange={(event) => setVariantSearch(event.target.value)}
+                    placeholder="Search variants"
+                    autoComplete="off"
+                  />
+                </label>
+
+                <div className="variant-options" role="listbox" aria-label="Product variants">
+                  {filteredVariants.length > 0 ? (
+                    filteredVariants.map((item) => {
+                      const itemPrice = item.discount_price || item.price || 0
+                      const isSelected = item.id === variant?.id
+
+                      return (
+                        <button
+                          key={item.id}
+                          type="button"
+                          className={`variant-option${isSelected ? " selected" : ""}`}
+                          onClick={() => setSelectedVariantId(item.id)}
+                          role="option"
+                          aria-selected={isSelected}
+                        >
+                          <span>{item.name || "Standard"}</span>
+                          <strong>{`\u20b9${(itemPrice / 100).toLocaleString("en-IN")}`}</strong>
+                        </button>
+                      )
+                    })
+                  ) : (
+                    <p className="variant-empty">No variants match your search.</p>
+                  )}
+                </div>
+              </div>
+            )}
 
             <div className="detail-card">
               <h6>Details</h6>
@@ -204,13 +316,24 @@ function ProductDetails() {
             </div>
 
             <div className="product-action-row">
-              <button className="primary add-cart-button" type="button">
-                <LuShoppingBag /> Add to Cart
+              <button
+                className="primary add-cart-button"
+                type="button"
+                onClick={handleAddToCart}
+                disabled={isAddingToCart || !variant?.id}
+              >
+                <LuShoppingBag /> {isAddingToCart ? "Adding..." : "Add to Cart"}
               </button>
               <button className="wishlist-button" type="button" aria-label="Add to wishlist">
                 <LuHeart />
               </button>
             </div>
+
+            {(cartMessage || cartError) && (
+              <p className={`cart-feedback ${cartError ? "error" : ""}`}>
+                {cartError || cartMessage}
+              </p>
+            )}
           </div>
         </div>
 

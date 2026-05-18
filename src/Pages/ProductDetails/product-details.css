@@ -82,6 +82,113 @@
     line-height: 1.65;
 }
 
+.variant-picker {
+    display: grid;
+    gap: 0.85rem;
+    margin-top: 0.25rem;
+}
+
+.variant-picker-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    color: #3c1d2d;
+    font-size: 0.95rem;
+    font-weight: 800;
+}
+
+.variant-picker-heading small {
+    color: #a56a7c;
+    font-size: 0.78rem;
+    font-weight: 700;
+}
+
+.variant-search {
+    display: grid;
+    grid-template-columns: 1.1rem minmax(0, 1fr);
+    align-items: center;
+    gap: 0.65rem;
+    min-height: 2.8rem;
+    padding: 0 0.95rem;
+    border: 1px solid #f3baca;
+    border-radius: 0.85rem;
+    background: #fffcfb;
+    color: #8b5365;
+}
+
+.variant-search:focus-within {
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 3px rgb(221 95 137 / 12%);
+}
+
+.variant-search input {
+    width: 100%;
+    min-width: 0;
+    border: 0;
+    outline: 0;
+    background: transparent;
+    color: #321528;
+    font: inherit;
+}
+
+.variant-search input::placeholder {
+    color: #b78191;
+}
+
+.variant-options {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.65rem;
+}
+
+.variant-option {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    min-height: 3rem;
+    padding: 0.65rem 0.85rem;
+    border: 1px solid #f3baca;
+    border-radius: 0.85rem;
+    background: #fffcfb;
+    color: #6a3d4c;
+    text-align: left;
+}
+
+.variant-option:hover,
+.variant-option.selected {
+    border-color: var(--color-primary);
+    background: #fff1ee;
+    color: #321528;
+}
+
+.variant-option span {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.9rem;
+    font-weight: 800;
+}
+
+.variant-option strong {
+    flex: 0 0 auto;
+    color: var(--color-primary);
+    font-size: 0.88rem;
+    font-weight: 800;
+}
+
+.variant-empty {
+    grid-column: 1 / -1;
+    padding: 0.85rem;
+    border-radius: 0.85rem;
+    background: #fff1ee;
+    color: #9a6577;
+    font-size: 0.9rem;
+    text-align: center;
+}
+
 .detail-card {
     width: 100%;
     margin-top: 0.35rem;
@@ -191,6 +298,17 @@
     color: var(--color-primary);
 }
 
+.cart-feedback {
+    margin-top: -0.2rem;
+    color: var(--color-success);
+    font-size: 0.92rem;
+    font-weight: 700;
+}
+
+.cart-feedback.error {
+    color: var(--color-error);
+}
+
 .related-products {
     margin-top: 4.75rem;
 }
@@ -241,5 +359,9 @@
 
     .product-action-row {
         grid-template-columns: minmax(0, 1fr) 3.5rem;
+    }
+
+    .variant-options {
+        grid-template-columns: 1fr;
     }
 }

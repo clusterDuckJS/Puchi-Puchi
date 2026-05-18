@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from 'react';
 import Header from './Components/Header/Header'
 import Home from './Pages/Home/Home'
@@ -14,6 +13,15 @@ import AuthForm from './Components/Auth/AuthForm';
 import Profile from './Pages/Profile/Profile';
 import AdminLogin from './Pages/Admin/AdminLogin';
 import Admin from './Pages/Admin/Admin';
+import Cart from './Pages/Cart/Cart';
+
+const withTimeout = (promise, timeoutMs = 8000) =>
+  Promise.race([
+    promise,
+    new Promise((_, reject) => {
+      window.setTimeout(() => reject(new Error("Request timed out")), timeoutMs);
+    }),
+  ]);
 
 function App() {
   const [session, setSession] = useState(null);
@@ -24,7 +32,6 @@ function App() {
   const location = useLocation();
   const isAdminRoute = location.pathname.startsWith("/admin");
 
-  // 🔹 create profile
   const createProfile = async (user) => {
     const metadata = user.user_metadata ?? {};
     const fullName = metadata.full_name || metadata.name || "";
@@ -49,7 +56,6 @@ function App() {
     if (error) console.error("Profile error:", error.message);
   };
 
-  // 🔹 fetch profile
   const fetchProfile = async (userId) => {
     const { data, error } = await supabase
       .from("profiles")
@@ -68,8 +74,11 @@ function App() {
   };
 
   useEffect(() => {
-    // 🔹 handle existing session
-    supabase.auth.getSession().then(async ({ data }) => {
+    let isCurrent = true;
+
+    withTimeout(supabase.auth.getSession()).then(async ({ data }) => {
+      if (!isCurrent) return;
+
       setSession(data.session);
 
       if (data.session?.user) {
@@ -77,10 +86,19 @@ function App() {
         await fetchProfile(data.session.user.id);
       }
 
-      setLoading(false);
+      if (isCurrent) {
+        setLoading(false);
+      }
+    }).catch((error) => {
+      console.warn("Session warning:", error.message);
+
+      if (isCurrent) {
+        setSession(null);
+        setProfile(null);
+        setLoading(false);
+      }
     });
 
-    // 🔹 listen to auth changes
     const { data: listener } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         setSession(session);
@@ -98,13 +116,14 @@ function App() {
       }
     );
 
-    return () => listener.subscription.unsubscribe();
+    return () => {
+      isCurrent = false;
+      listener.subscription.unsubscribe();
+    };
   }, [navigate]);
 
-  // 🔴 loading
   if (loading) return <div>Loading...</div>;
 
-  // ✅ MAIN APP (always render layout)
   return (
     <>
       {!isAdminRoute && (
@@ -120,6 +139,7 @@ function App() {
         <Route path="/product/:id" element={<ProductDetails />} />
         <Route path="/about" element={<About />} />
         <Route path="/shop" element={<Shop />} />
+        <Route path="/cart" element={<Cart />} />
         <Route path="/reviews" element={<Reviews />} />
         <Route path="/faq" element={<Faq />} />
         <Route

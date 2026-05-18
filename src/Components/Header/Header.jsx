@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { LuLogOut, LuMenu, LuSearch, LuShoppingBag, LuUser, LuX } from "react-icons/lu";
 import { NavLink, useNavigate } from "react-router-dom";
 import LOGO from "../../assets/puchi_logo_tran.svg";
+import { CART_UPDATED_EVENT, getCartItemCount } from "../../utils/cart";
 import { supabase } from "../../utils/supabase";
 import AuthForm from "../Auth/AuthForm";
 import AuthModal from "../Auth/AuthModal";
@@ -12,7 +13,41 @@ function Header({ profile, user }) {
   const [openAuth, setOpenAuth] = useState(false);
   const [openMenu, setOpenMenu] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [cartCount, setCartCount] = useState(0);
   const firstName = profile?.first_name || user?.user_metadata?.first_name;
+
+  useEffect(() => {
+    let isCurrent = true;
+
+    const refreshCartCount = async () => {
+      if (!user?.id) {
+        setCartCount(0);
+        return;
+      }
+
+      try {
+        const count = await getCartItemCount(user.id);
+
+        if (isCurrent) {
+          setCartCount(count);
+        }
+      } catch (error) {
+        console.error("Cart count error:", error);
+
+        if (isCurrent) {
+          setCartCount(0);
+        }
+      }
+    };
+
+    refreshCartCount();
+    window.addEventListener(CART_UPDATED_EVENT, refreshCartCount);
+
+    return () => {
+      isCurrent = false;
+      window.removeEventListener(CART_UPDATED_EVENT, refreshCartCount);
+    };
+  }, [user?.id]);
 
   const closeMobileMenu = () => {
     setOpenMenu(false);
@@ -134,10 +169,15 @@ function Header({ profile, user }) {
               </>
             )}
 
-            <button className="header-icon-btn cart-btn" type="button" aria-label="Cart">
+            <NavLink
+              to="/cart"
+              className="header-icon-btn cart-btn"
+              aria-label="Cart"
+              onClick={closeMobileMenu}
+            >
               <LuShoppingBag />
-              <span className="cart-count">2</span>
-            </button>
+              {cartCount > 0 && <span className="cart-count">{cartCount}</span>}
+            </NavLink>
           </div>
         </div>
       </header>
