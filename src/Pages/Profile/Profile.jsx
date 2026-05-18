@@ -10,6 +10,15 @@ function Profile({ user, profile, onProfileUpdated }) {
   const [saveError, setSaveError] = useState("");
   const [saveSuccess, setSaveSuccess] = useState("");
   const [isSaving, setIsSaving] = useState(false);
+  const profileSnapshot = `${profile?.first_name ?? ""}\0${profile?.last_name ?? ""}\0${profile?.phone ?? ""}`;
+  const [loadedProfileSnapshot, setLoadedProfileSnapshot] = useState(profileSnapshot);
+
+  if (loadedProfileSnapshot !== profileSnapshot) {
+    setLoadedProfileSnapshot(profileSnapshot);
+    setFirstName(profile?.first_name ?? "");
+    setLastName(profile?.last_name ?? "");
+    setPhone(profile?.phone ?? "");
+  }
 
   const handleSubmit = async (event) => {
     event.preventDefault();

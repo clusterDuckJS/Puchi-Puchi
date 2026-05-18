@@ -32,7 +32,15 @@ const getCashfreeErrorMessage = (data: Record<string, unknown>) => {
   return "Cashfree order creation failed."
 }
 
-const normalizePhone = (phone?: string | null) => phone?.replace(/\D/g, "") || ""
+const normalizePhone = (phone?: string | null) => {
+  const digits = phone?.replace(/\D/g, "") || ""
+
+  if (digits.length === 12 && digits.startsWith("91")) {
+    return digits.slice(2)
+  }
+
+  return digits
+}
 
 serve(async (request) => {
   if (request.method === "OPTIONS") {
@@ -139,7 +147,11 @@ serve(async (request) => {
     return jsonResponse({ error: "Please complete your profile before checkout." }, 400)
   }
 
-  const customerPhone = normalizePhone(profile.phone)
+  const customerPhone = normalizePhone(
+    profile.phone ||
+      (typeof user.user_metadata?.phone === "string" ? user.user_metadata.phone : null) ||
+      user.phone,
+  )
 
   if (customerPhone.length < 10) {
     return jsonResponse({ error: "Please add a valid phone number in your profile." }, 400)

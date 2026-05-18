@@ -29,21 +29,35 @@ function App() {
     const fullName = metadata.full_name || metadata.name || "";
     const [fallbackFirstName, ...fallbackLastName] = fullName.split(" ").filter(Boolean);
 
+    const firstName = metadata.first_name || fallbackFirstName;
+    const lastName = metadata.last_name || fallbackLastName.join(" ");
+    const phone = metadata.phone?.trim();
+
+    const { data: existingProfile, error: fetchError } = await supabase
+      .from("profiles")
+      .select("id, first_name, last_name, phone")
+      .eq("id", user.id)
+      .maybeSingle();
+
+    if (fetchError) {
+      console.error("Profile lookup error:", fetchError.message);
+      return;
+    }
+
     const profileData = {
       id: user.id,
       email: user.email,
     };
 
-    const firstName = metadata.first_name || fallbackFirstName;
-    const lastName = metadata.last_name || fallbackLastName.join(" ");
+    if (!existingProfile?.first_name && firstName) profileData.first_name = firstName;
+    if (!existingProfile?.last_name && lastName) profileData.last_name = lastName;
+    if (!existingProfile?.phone && phone) profileData.phone = phone;
 
-    if (firstName) profileData.first_name = firstName;
-    if (lastName) profileData.last_name = lastName;
-    if (metadata.phone) profileData.phone = metadata.phone;
+    const query = existingProfile
+      ? supabase.from("profiles").update(profileData).eq("id", user.id)
+      : supabase.from("profiles").insert(profileData);
 
-    const { error } = await supabase.from("profiles").upsert(profileData, {
-      onConflict: "id",
-    });
+    const { error } = await query;
 
     if (error) console.error("Profile error:", error.message);
   };
