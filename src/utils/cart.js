@@ -11,20 +11,12 @@ const notifyCartUpdated = () => {
   }
 }
 
-export const getCurrentUserId = async (timeoutMs = 8000) => {
-  try {
-    const { data } = await Promise.race([
-      supabase.auth.getSession(),
-      new Promise((_, reject) => {
-        window.setTimeout(() => reject(new Error("Request timed out")), timeoutMs)
-      }),
-    ])
+export const getCurrentUserId = async () => {
+  const { data, error } = await supabase.auth.getSession()
 
-    return data.session?.user?.id || null
-  } catch (error) {
-    if (error.message === "Request timed out") return null
-    throw error
-  }
+  if (error) throw error
+
+  return data.session?.user?.id || null
 }
 
 export const getPendingOrder = async (userId) => {

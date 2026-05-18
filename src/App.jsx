@@ -16,18 +16,9 @@ import Admin from './Pages/Admin/Admin';
 import Cart from './Pages/Cart/Cart';
 import PaymentStatus from './Pages/PaymentStatus/PaymentStatus';
 
-const withTimeout = (promise, timeoutMs = 8000) =>
-  Promise.race([
-    promise,
-    new Promise((_, reject) => {
-      window.setTimeout(() => reject(new Error("Request timed out")), timeoutMs);
-    }),
-  ]);
-
 function App() {
   const [session, setSession] = useState(null);
   const [profile, setProfile] = useState(null);
-  const [loading, setLoading] = useState(true);
 
   const navigate = useNavigate();
   const location = useLocation();
@@ -77,7 +68,7 @@ function App() {
   useEffect(() => {
     let isCurrent = true;
 
-    withTimeout(supabase.auth.getSession()).then(async ({ data }) => {
+    supabase.auth.getSession().then(async ({ data }) => {
       if (!isCurrent) return;
 
       setSession(data.session);
@@ -87,16 +78,12 @@ function App() {
         await fetchProfile(data.session.user.id);
       }
 
-      if (isCurrent) {
-        setLoading(false);
-      }
     }).catch((error) => {
-      console.warn("Session warning:", error.message);
+      console.error("Session error:", error.message);
 
       if (isCurrent) {
         setSession(null);
         setProfile(null);
-        setLoading(false);
       }
     });
 
@@ -122,8 +109,6 @@ function App() {
       listener.subscription.unsubscribe();
     };
   }, [navigate]);
-
-  if (loading) return <div>Loading...</div>;
 
   return (
     <>
