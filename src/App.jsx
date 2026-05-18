@@ -19,10 +19,13 @@ import PaymentStatus from './Pages/PaymentStatus/PaymentStatus';
 function App() {
   const [session, setSession] = useState(null);
   const [profile, setProfile] = useState(null);
+  const [authLoading, setAuthLoading] = useState(true);
+  const [profileLoading, setProfileLoading] = useState(false);
 
   const navigate = useNavigate();
   const location = useLocation();
   const isAdminRoute = location.pathname.startsWith("/admin");
+  const isCheckingAdminAccess = authLoading || (session?.user && profileLoading);
 
   const createProfile = async (user) => {
     const metadata = user.user_metadata ?? {};
@@ -82,7 +85,14 @@ function App() {
   useEffect(() => {
     const { data: listener } = supabase.auth.onAuthStateChange(
       (event, nextSession) => {
+        if (nextSession?.user) {
+          setProfileLoading(true);
+        } else {
+          setProfileLoading(false);
+        }
+
         setSession(nextSession);
+        setAuthLoading(false);
 
         if (event === "SIGNED_OUT") {
           setProfile(null);
@@ -120,6 +130,10 @@ function App() {
 
       if (isCurrent) {
         setProfile(null);
+      }
+    }).finally(() => {
+      if (isCurrent) {
+        setProfileLoading(false);
       }
     });
 
@@ -164,7 +178,11 @@ function App() {
         <Route
           path="/admin/login"
           element={
-            profile?.role === "admin" ? (
+            isCheckingAdminAccess ? (
+              <main className="admin-login-page">
+                <p className="admin-status-message">Checking admin access...</p>
+              </main>
+            ) : profile?.role === "admin" ? (
               <Navigate to="/admin" replace />
             ) : (
               <AdminLogin />
@@ -174,7 +192,11 @@ function App() {
         <Route
           path="/admin/*"
           element={
-            session?.user && profile?.role === "admin" ? (
+            isCheckingAdminAccess ? (
+              <main className="admin-login-page">
+                <p className="admin-status-message">Checking admin access...</p>
+              </main>
+            ) : session?.user && profile?.role === "admin" ? (
               <Admin />
             ) : (
               <Navigate to="/admin/login" replace />
