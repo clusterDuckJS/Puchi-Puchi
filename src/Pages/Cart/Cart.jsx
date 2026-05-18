@@ -8,6 +8,8 @@ import {
   removeCartItem,
   updateCartItemQuantity,
 } from "../../utils/cart"
+import { openCashfreeCheckout } from "../../utils/cashfree"
+import { supabase } from "../../utils/supabase"
 import "./cart.css"
 
 const SHIPPING_OPTIONS = {
@@ -37,6 +39,7 @@ function Cart() {
   const [shippingMethod, setShippingMethod] = useState("standard")
   const [hasInsurance, setHasInsurance] = useState(false)
   const [craftingSpeed, setCraftingSpeed] = useState("standard")
+  const [isCheckingOut, setIsCheckingOut] = useState(false)
 
   const loadCart = useCallback(async () => {
     setLoading(true)
@@ -117,6 +120,42 @@ function Cart() {
       setErrorMessage("We could not remove that item.")
     } finally {
       setBusyItemId("")
+    }
+  }
+
+  const handleCheckout = async () => {
+    if (!order?.id || isCheckingOut) return
+
+    setIsCheckingOut(true)
+    setErrorMessage("")
+
+    try {
+      const { data, error } = await supabase.functions.invoke("create-cashfree-order", {
+        body: {
+          orderId: order.id,
+          shippingMethod,
+          hasInsurance,
+          craftingSpeed,
+        },
+      })
+
+      if (error) {
+        throw error
+      }
+
+      if (!data?.payment_session_id) {
+        throw new Error("Cashfree did not return a payment session.")
+      }
+
+      await openCashfreeCheckout(data.payment_session_id)
+    } catch (error) {
+      console.error("Checkout error:", error)
+      setErrorMessage(
+        error.context?.error ||
+        error.message ||
+        "We could not start checkout. Please try again.",
+      )
+      setIsCheckingOut(false)
     }
   }
 
@@ -304,8 +343,13 @@ function Cart() {
                 <strong>{formatCartPrice(total)}</strong>
               </div>
 
-              <button className="primary cart-checkout-button" type="button">
-                Proceed to Checkout
+              <button
+                className="primary cart-checkout-button"
+                type="button"
+                onClick={handleCheckout}
+                disabled={isCheckingOut}
+              >
+                {isCheckingOut ? "Opening Checkout..." : "Proceed to Checkout"}
               </button>
               <p>Secure checkout | India-wide shipping</p>
             </aside>

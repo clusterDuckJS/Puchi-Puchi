@@ -14,6 +14,7 @@ import Profile from './Pages/Profile/Profile';
 import AdminLogin from './Pages/Admin/AdminLogin';
 import Admin from './Pages/Admin/Admin';
 import Cart from './Pages/Cart/Cart';
+import PaymentStatus from './Pages/PaymentStatus/PaymentStatus';
 
 const withTimeout = (promise, timeoutMs = 8000) =>
   Promise.race([
@@ -140,6 +141,7 @@ function App() {
         <Route path="/about" element={<About />} />
         <Route path="/shop" element={<Shop />} />
         <Route path="/cart" element={<Cart />} />
+        <Route path="/payment-status" element={<PaymentStatus />} />
         <Route path="/reviews" element={<Reviews />} />
         <Route path="/faq" element={<Faq />} />
         <Route

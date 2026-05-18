@@ -1,0 +1,84 @@
+.payment-status-page {
+    min-height: 100vh;
+    display: grid;
+    place-items: center;
+    padding: 4rem 1rem;
+    background: #fff5f7;
+}
+
+.payment-status-card {
+    display: grid;
+    justify-items: center;
+    gap: 0.9rem;
+    width: min(100%, 38rem);
+    padding: 2.5rem;
+    border-radius: 1.2rem;
+    background: #fffcfb;
+    box-shadow: 0 20px 55px rgb(221 95 137 / 10%);
+    text-align: center;
+}
+
+.payment-status-icon {
+    color: var(--color-primary);
+    font-size: 2.35rem;
+}
+
+.payment-status-icon.success {
+    color: var(--color-success);
+}
+
+.payment-status-icon.error {
+    color: var(--color-error);
+}
+
+.payment-status-icon.pending {
+    color: #d98a2f;
+}
+
+.payment-status-icon.spin {
+    animation: payment-spin 1s linear infinite;
+}
+
+.payment-status-card h1 {
+    color: #321528;
+    font-size: clamp(2rem, 4vw, 2.7rem);
+    font-weight: 800;
+}
+
+.payment-status-card p {
+    max-width: 34rem;
+    color: #8d6b75;
+}
+
+.payment-status-actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.8rem;
+    margin-top: 1rem;
+}
+
+.payment-status-actions a {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 2.8rem;
+    padding: 0.75rem 1.25rem;
+    border-radius: 999px;
+    background: var(--color-primary);
+    color: white;
+    font-weight: 800;
+    text-decoration: none;
+}
+
+.payment-status-actions a:last-child {
+    border: 1px solid #f1b7c8;
+    background: transparent;
+    color: var(--color-primary);
+}
+
+@keyframes payment-spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
