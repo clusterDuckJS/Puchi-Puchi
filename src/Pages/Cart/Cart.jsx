@@ -5,6 +5,7 @@ import {
   fetchCart,
   formatCartPrice,
   getCurrentUserId,
+  parseCartListField,
   removeCartItem,
   updateCartItemQuantity,
 } from "../../utils/cart"
@@ -204,7 +205,8 @@ function Cart() {
               {items.map((item) => {
                 const product = item.products || {}
                 const variant = item.product_variants || {}
-                const image = variant.image_url || "https://via.placeholder.com/160"
+                const customUpload = item.custom_uploads?.[0]
+                const image = parseCartListField(variant.image_urls || variant.image_url)[0] || "https://via.placeholder.com/160"
                 const quantity = item.quantity || 1
                 const isBusy = busyItemId === item.id
 
@@ -215,6 +217,16 @@ function Cart() {
                     <div className="cart-item-details">
                       <h3>{product.name || "Puchi Puchi figurine"}</h3>
                       {variant.name && <small>{variant.name}</small>}
+                      {customUpload?.image_url && (
+                        <a
+                          className="cart-custom-reference"
+                          href={customUpload.image_url}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          View uploaded reference
+                        </a>
+                      )}
                       <p>{formatCartPrice(item.price)}</p>
 
                       <div className="cart-quantity-stepper" aria-label="Quantity selector">

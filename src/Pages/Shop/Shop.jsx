@@ -7,6 +7,14 @@ import './shop.css'
 
 const normalizeCategory = (category) => category?.trim().toLowerCase() || ''
 
+const parseListField = (value) => {
+  if (Array.isArray(value)) return value.map(String).filter(Boolean)
+  if (!value) return []
+  return String(value).split(',').map((item) => item.trim()).filter(Boolean)
+}
+
+const getProductCategories = (product) => parseListField(product.categories || product.category)
+
 const formatCategory = (category) => {
   const normalized = normalizeCategory(category)
 
@@ -36,16 +44,9 @@ function Shop() {
         const { data, error } = await withRequestTimeout(supabase
           .from('products')
           .select(`
-            id,
-            name,
-            category,
-            is_active,
+            *,
             product_variants (
-              id,
-              name,
-              price,
-              discount_price,
-              image_url
+              *
             )
           `)
           .eq('is_active', true))
@@ -87,11 +88,13 @@ function Shop() {
     const categoryMap = new Map()
 
     products.forEach((product) => {
-      const key = normalizeCategory(product.category)
+      getProductCategories(product).forEach((category) => {
+        const key = normalizeCategory(category)
 
-      if (key && !categoryMap.has(key)) {
-        categoryMap.set(key, formatCategory(product.category))
-      }
+        if (key && !categoryMap.has(key)) {
+          categoryMap.set(key, formatCategory(category))
+        }
+      })
     })
 
     return [
@@ -103,7 +106,9 @@ function Shop() {
   const filteredProducts = useMemo(() => {
     if (selectedCategory === 'all') return products
 
-    return products.filter((product) => normalizeCategory(product.category) === selectedCategory)
+    return products.filter((product) => (
+      getProductCategories(product).some((category) => normalizeCategory(category) === selectedCategory)
+    ))
   }, [products, selectedCategory])
 
   return (
@@ -159,7 +164,8 @@ function Shop() {
                 key={product.id}
                 product={{
                   ...product,
-                  category: formatCategory(product.category),
+                  categories: getProductCategories(product).map(formatCategory),
+                  category: formatCategory(getProductCategories(product)[0] || product.category),
                 }}
                 onClick={(selectedProduct) => navigate(`/product/${selectedProduct.id}`)}
               />

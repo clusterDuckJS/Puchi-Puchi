@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   LuBoxes,
   LuChartNoAxesCombined,
+  LuChevronDown,
+  LuImagePlus,
   LuIndianRupee,
   LuLayoutDashboard,
   LuLogOut,
@@ -66,18 +68,45 @@ const adminNav = [
   { to: "/admin/products", label: "Products", icon: LuShoppingBag },
 ];
 
+const PRODUCT_CATEGORY_OPTIONS = [
+  "Controversial",
+  "Gods",
+  "Funko",
+  "Gaming",
+  "TV Show",
+  "Movie",
+  "Pet",
+  "Made Just for You",
+];
+
+const normalizeListValue = (value) => value.trim().replace(/\s+/g, " ");
+
+const parseListField = (value) => {
+  if (Array.isArray(value)) {
+    return value.map(String).map(normalizeListValue).filter(Boolean);
+  }
+
+  if (!value) return [];
+
+  return String(value)
+    .split(",")
+    .map(normalizeListValue)
+    .filter(Boolean);
+};
+
 const createBlankVariant = () => ({
   name: "",
   price: "",
   discount_price: "",
   stock: "0",
-  image_url: "",
+  image_urls: [""],
   is_active: true,
 });
 
 const createBlankProductForm = () => ({
   name: "",
-  category: "",
+  categories: [],
+  customCategory: "",
   description: "",
   is_custom: false,
   is_active: true,
@@ -273,7 +302,14 @@ function ProductFormModal({
   mode,
   onClose,
   onProductChange,
+  onCategoryToggle,
+  onCustomCategoryChange,
+  onAddCustomCategory,
+  onRemoveCategory,
   onVariantChange,
+  onVariantImageChange,
+  onAddVariantImage,
+  onRemoveVariantImage,
   onAddVariant,
   onRemoveVariant,
   onSubmit,
@@ -286,7 +322,7 @@ function ProductFormModal({
         <div className="admin-modal-header">
           <div>
             <h2>{mode === "edit" ? "Edit Product" : "Add Product"}</h2>
-            <p>Manage product details and size variants.</p>
+            <p>Manage product details, categories, and size variants.</p>
           </div>
           <button type="button" aria-label="Close product form" onClick={onClose}>
             <LuX />
@@ -306,13 +342,58 @@ function ProductFormModal({
           </fieldset>
 
           <fieldset>
-            <label htmlFor="productCategory">Category</label>
-            <input
-              id="productCategory"
-              type="text"
-              value={form.category}
-              onChange={(event) => onProductChange("category", event.target.value)}
-            />
+            <label htmlFor="productCategories">Categories</label>
+            <details className="admin-category-select">
+              <summary id="productCategories">
+                <span>
+                  {form.categories.length
+                    ? `${form.categories.length} selected`
+                    : "Choose categories"}
+                </span>
+                <LuChevronDown />
+              </summary>
+
+              <div className="admin-category-menu">
+                {PRODUCT_CATEGORY_OPTIONS.map((category) => (
+                  <label className="admin-category-option" key={category}>
+                    <input
+                      type="checkbox"
+                      checked={form.categories.includes(category)}
+                      onChange={() => onCategoryToggle(category)}
+                    />
+                    <span>{category}</span>
+                  </label>
+                ))}
+
+                <div className="admin-custom-category">
+                  <input
+                    type="text"
+                    value={form.customCategory}
+                    onChange={(event) => onCustomCategoryChange(event.target.value)}
+                    placeholder="Add custom category"
+                  />
+                  <button type="button" onClick={onAddCustomCategory}>
+                    <LuPlus />
+                    <span>Add</span>
+                  </button>
+                </div>
+              </div>
+            </details>
+
+            {form.categories.length > 0 && (
+              <div className="admin-category-tags" aria-label="Selected categories">
+                {form.categories.map((category) => (
+                  <button
+                    type="button"
+                    key={category}
+                    onClick={() => onRemoveCategory(category)}
+                  >
+                    <span>{category}</span>
+                    <LuX />
+                  </button>
+                ))}
+              </div>
+            )}
           </fieldset>
 
           <fieldset className="admin-form-wide">
@@ -415,13 +496,41 @@ function ProductFormModal({
                 </fieldset>
 
                 <fieldset className="admin-form-wide">
-                  <label htmlFor={`variantImage-${index}`}>Image URL</label>
-                  <input
-                    id={`variantImage-${index}`}
-                    type="url"
-                    value={variant.image_url}
-                    onChange={(event) => onVariantChange(index, "image_url", event.target.value)}
-                  />
+                  <div className="admin-variant-images-heading">
+                    <label>Variant Images</label>
+                    <button
+                      type="button"
+                      onClick={() => onAddVariantImage(index)}
+                      disabled={variant.image_urls.length >= 5}
+                    >
+                      <LuImagePlus />
+                      <span>Add Image</span>
+                    </button>
+                  </div>
+
+                  <div className="admin-variant-images">
+                    {variant.image_urls.map((imageUrl, imageIndex) => (
+                      <div className="admin-variant-image-row" key={imageIndex}>
+                        <input
+                          id={`variantImage-${index}-${imageIndex}`}
+                          type="url"
+                          value={imageUrl}
+                          placeholder={`Image URL ${imageIndex + 1}`}
+                          onChange={(event) => onVariantImageChange(index, imageIndex, event.target.value)}
+                        />
+                        {variant.image_urls.length > 1 && (
+                          <button
+                            type="button"
+                            aria-label={`Remove image ${imageIndex + 1}`}
+                            onClick={() => onRemoveVariantImage(index, imageIndex)}
+                          >
+                            <LuTrash2 />
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                  <small className="admin-field-help">Add up to 5 images. The first image is used as the main storefront image.</small>
                 </fieldset>
 
                 <label className="admin-check admin-variant-active">
@@ -471,25 +580,9 @@ function ProductsPage() {
       const { data, error: fetchError } = await withRequestTimeout(supabase
         .from("products")
         .select(`
-          id,
-          name,
-          description,
-          category,
-          is_custom,
-          is_active,
-          is_featured,
-          is_best_seller,
-          is_new_arrival,
-          created_at,
+          *,
           product_variants (
-            id,
-            name,
-            price,
-            discount_price,
-            stock,
-            image_url,
-            is_active,
-            created_at
+            *
           )
         `)
         .order("created_at", { ascending: false }));
@@ -526,7 +619,9 @@ function ProductsPage() {
     if (!normalizedQuery) return products;
 
     return products.filter((product) => {
-      return [product.name, product.category, product.description]
+      const categories = parseListField(product.categories || product.category).join(" ");
+
+      return [product.name, categories, product.description]
         .filter(Boolean)
         .some((value) => value.toLowerCase().includes(normalizedQuery));
     });
@@ -547,14 +642,17 @@ function ProductsPage() {
         price: centsToRupees(variant.price),
         discount_price: centsToRupees(variant.discount_price),
         stock: String(variant.stock ?? 0),
-        image_url: variant.image_url || "",
+        image_urls: parseListField(variant.image_urls || variant.image_url).length
+          ? parseListField(variant.image_urls || variant.image_url).slice(0, 5)
+          : [""],
         is_active: variant.is_active ?? true,
       }))
       : [createBlankVariant()];
 
     setForm({
       name: product.name || "",
-      category: product.category || "",
+      categories: parseListField(product.categories || product.category),
+      customCategory: "",
       description: product.description || "",
       is_custom: product.is_custom ?? false,
       is_active: product.is_active ?? true,
@@ -583,12 +681,91 @@ function ProductsPage() {
     }));
   };
 
+  const toggleCategory = (category) => {
+    setForm((current) => {
+      const exists = current.categories.includes(category);
+
+      return {
+        ...current,
+        categories: exists
+          ? current.categories.filter((item) => item !== category)
+          : [...current.categories, category],
+      };
+    });
+  };
+
+  const addCustomCategory = () => {
+    const category = normalizeListValue(form.customCategory);
+
+    if (!category) return;
+
+    setForm((current) => ({
+      ...current,
+      categories: current.categories.includes(category)
+        ? current.categories
+        : [...current.categories, category],
+      customCategory: "",
+    }));
+  };
+
+  const removeCategory = (category) => {
+    setForm((current) => ({
+      ...current,
+      categories: current.categories.filter((item) => item !== category),
+    }));
+  };
+
   const handleVariantChange = (index, field, value) => {
     setForm((current) => ({
       ...current,
       variants: current.variants.map((variant, variantIndex) => (
         variantIndex === index ? { ...variant, [field]: value } : variant
       )),
+    }));
+  };
+
+  const handleVariantImageChange = (variantIndex, imageIndex, value) => {
+    setForm((current) => ({
+      ...current,
+      variants: current.variants.map((variant, currentVariantIndex) => {
+        if (currentVariantIndex !== variantIndex) return variant;
+
+        return {
+          ...variant,
+          image_urls: variant.image_urls.map((imageUrl, currentImageIndex) => (
+            currentImageIndex === imageIndex ? value : imageUrl
+          )),
+        };
+      }),
+    }));
+  };
+
+  const addVariantImage = (variantIndex) => {
+    setForm((current) => ({
+      ...current,
+      variants: current.variants.map((variant, currentVariantIndex) => (
+        currentVariantIndex === variantIndex && variant.image_urls.length < 5
+          ? { ...variant, image_urls: [...variant.image_urls, ""] }
+          : variant
+      )),
+    }));
+  };
+
+  const removeVariantImage = (variantIndex, imageIndex) => {
+    setForm((current) => ({
+      ...current,
+      variants: current.variants.map((variant, currentVariantIndex) => {
+        if (currentVariantIndex !== variantIndex) return variant;
+
+        const nextImages = variant.image_urls.filter((_, currentImageIndex) => (
+          currentImageIndex !== imageIndex
+        ));
+
+        return {
+          ...variant,
+          image_urls: nextImages.length ? nextImages : [""],
+        };
+      }),
     }));
   };
 
@@ -610,14 +787,23 @@ function ProductsPage() {
     event.preventDefault();
     setFormError("");
 
-    const variants = form.variants.map((variant) => ({
-      name: variant.name.trim() || null,
-      price: rupeesToCents(variant.price),
-      discount_price: variant.discount_price === "" ? null : rupeesToCents(variant.discount_price),
-      stock: Number(variant.stock || 0),
-      image_url: variant.image_url.trim() || null,
-      is_active: variant.is_active,
-    }));
+    const categories = form.categories.map(normalizeListValue).filter(Boolean);
+    const variants = form.variants.map((variant) => {
+      const imageUrls = variant.image_urls
+        .map(normalizeListValue)
+        .filter(Boolean)
+        .slice(0, 5);
+
+      return {
+        name: variant.name.trim() || null,
+        price: rupeesToCents(variant.price),
+        discount_price: variant.discount_price === "" ? null : rupeesToCents(variant.discount_price),
+        stock: Number(variant.stock || 0),
+        image_url: imageUrls[0] || null,
+        image_urls: imageUrls,
+        is_active: variant.is_active,
+      };
+    });
 
     if (!form.name.trim()) {
       setFormError("Product name is required.");
@@ -633,7 +819,8 @@ function ProductsPage() {
 
     const productPayload = {
       name: form.name.trim(),
-      category: form.category.trim() || null,
+      category: categories[0] || null,
+      categories,
       description: form.description.trim() || null,
       is_custom: form.is_custom,
       is_active: form.is_active,
@@ -723,12 +910,13 @@ function ProductsPage() {
             const variants = product.product_variants || [];
             const activeVariant = variants.find((variant) => variant.is_active) || variants[0];
             const price = activeVariant?.discount_price || activeVariant?.price || 0;
-            const image = activeVariant?.image_url || "https://via.placeholder.com/600";
+            const image = parseListField(activeVariant?.image_urls || activeVariant?.image_url)[0] || "https://via.placeholder.com/600";
+            const categories = parseListField(product.categories || product.category);
 
             return (
               <article className="admin-product-card" key={product.id}>
                 <img src={image} alt={product.name} />
-                <p>{product.category || "Uncategorized"}</p>
+                <p>{categories.length ? categories.join(", ") : "Uncategorized"}</p>
                 <h3>{product.name}</h3>
                 <strong>{currency.format(price / 100)}</strong>
                 <small>{variants.length} variant{variants.length === 1 ? "" : "s"}</small>
@@ -750,7 +938,14 @@ function ProductsPage() {
           mode={modalMode}
           onClose={closeModal}
           onProductChange={handleProductChange}
+          onCategoryToggle={toggleCategory}
+          onCustomCategoryChange={(value) => handleProductChange("customCategory", value)}
+          onAddCustomCategory={addCustomCategory}
+          onRemoveCategory={removeCategory}
           onVariantChange={handleVariantChange}
+          onVariantImageChange={handleVariantImageChange}
+          onAddVariantImage={addVariantImage}
+          onRemoveVariantImage={removeVariantImage}
           onAddVariant={addVariant}
           onRemoveVariant={removeVariant}
           onSubmit={saveProduct}

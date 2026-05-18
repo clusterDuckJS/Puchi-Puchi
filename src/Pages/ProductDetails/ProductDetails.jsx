@@ -1,25 +1,37 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import './product-details.css'
 import { NavLink, useNavigate, useParams } from 'react-router-dom'
-import { LuArrowLeft, LuHeart, LuMinus, LuPlus, LuSearch, LuShoppingBag } from 'react-icons/lu'
+import { LuArrowLeft, LuHeart, LuImagePlus, LuMinus, LuPlus, LuSearch, LuShoppingBag, LuX } from 'react-icons/lu'
 import { supabase } from '../../utils/supabase'
 import ProductCard from '../../Components/ProductCard/ProductCard'
-import { addItemToCart, getCurrentUserId } from '../../utils/cart'
+import { addItemToCart, getCurrentUserId, uploadCustomOrderImage } from '../../utils/cart'
 import { isTimeoutError, withRequestTimeout } from '../../utils/request'
+
+const CUSTOM_IMAGE_MAX_BYTES = 15 * 1024 * 1024
+
+const parseListField = (value) => {
+  if (Array.isArray(value)) return value.map(String).filter(Boolean)
+  if (!value) return []
+  return String(value).split(',').map((item) => item.trim()).filter(Boolean)
+}
 
 function ProductDetails() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const customImageInputRef = useRef(null)
   const [product, setProduct] = useState(null)
   const [relatedProducts, setRelatedProducts] = useState([])
   const [quantity, setQuantity] = useState(1)
   const [selectedVariantId, setSelectedVariantId] = useState(null)
+  const [selectedImageIndex, setSelectedImageIndex] = useState(0)
   const [variantSearch, setVariantSearch] = useState("")
   const [loading, setLoading] = useState(true)
   const [productError, setProductError] = useState("")
   const [isAddingToCart, setIsAddingToCart] = useState(false)
   const [cartMessage, setCartMessage] = useState("")
   const [cartError, setCartError] = useState("")
+  const [customImageFile, setCustomImageFile] = useState(null)
+  const [customImagePreview, setCustomImagePreview] = useState("")
 
   useEffect(() => {
     let isCurrent = true
@@ -39,18 +51,9 @@ function ProductDetails() {
         const { data, error } = await withRequestTimeout(supabase
           .from("products")
           .select(`
-            id,
-            name,
-            description,
-            category,
+            *,
             product_variants (
-              id,
-              name,
-              price,
-              discount_price,
-              image_url,
-              stock,
-              is_active
+              *
             )
           `)
           .eq("id", id)
@@ -87,12 +90,23 @@ function ProductDetails() {
   }, [id])
 
   useEffect(() => {
+    return () => {
+      if (customImagePreview) {
+        URL.revokeObjectURL(customImagePreview)
+      }
+    }
+  }, [customImagePreview])
+
+  useEffect(() => {
     const variants = product?.product_variants || []
     const firstAvailableVariant = variants.find((variant) => variant.is_active !== false) || variants[0]
 
     setSelectedVariantId(firstAvailableVariant?.id || null)
+    setSelectedImageIndex(0)
     setVariantSearch("")
     setQuantity(1)
+    setCustomImageFile(null)
+    setCustomImagePreview("")
   }, [product])
 
   useEffect(() => {
@@ -103,16 +117,9 @@ function ProductDetails() {
         const { data, error } = await withRequestTimeout(supabase
           .from("products")
           .select(`
-            id,
-            name,
-            category,
-            is_active,
+            *,
             product_variants (
-              id,
-              name,
-              price,
-              discount_price,
-              image_url
+              *
             )
           `)
           .eq("is_active", true)
@@ -176,11 +183,17 @@ function ProductDetails() {
   const variant = variants.find((item) => item.id === selectedVariantId) || variants[0] || product.product_variants?.[0]
   const price = variant?.discount_price || variant?.price || 0
   const formattedPrice = `\u20b9${(price / 100).toLocaleString("en-IN")}`
-  const image = variant?.image_url || "https://via.placeholder.com/600"
+  const variantImages = parseListField(variant?.image_urls || variant?.image_url)
+  const image = variantImages[selectedImageIndex] || variantImages[0] || "https://via.placeholder.com/600"
+  const categories = parseListField(product.categories || product.category)
+  const categoryLabel = categories.join(", ")
+  const isMadeJustForYou = categories.some((category) => (
+    category.toLowerCase().replace(/[^a-z0-9]/g, "").includes("madejustforyou")
+  ))
 
   const details = [
     variant?.name && `Variant: ${variant.name}`,
-    product.category && `Series: ${product.category}`,
+    categoryLabel && `Series: ${categoryLabel}`,
     "Hand-painted details",
     "Includes careful gift-ready packaging",
   ].filter(Boolean)
@@ -194,6 +207,11 @@ function ProductDetails() {
       return
     }
 
+    if (isMadeJustForYou && !customImageFile) {
+      setCartError("Please upload one reference image before adding this custom product to your cart.")
+      return
+    }
+
     setIsAddingToCart(true)
 
     try {
@@ -204,20 +222,75 @@ function ProductDetails() {
         return
       }
 
+      const customImageUrl = isMadeJustForYou
+        ? await uploadCustomOrderImage({ file: customImageFile, userId })
+        : null
+
       await addItemToCart({
         userId,
         productId: product.id,
         variantId: variant.id,
         quantity,
         price,
+        customImageUrl,
       })
 
       setCartMessage("Added to cart.")
+      setCustomImageFile(null)
+      setCustomImagePreview("")
     } catch (error) {
       console.error("Add to cart error:", error)
       setCartError(error.message || "We could not add this item to your cart.")
     } finally {
       setIsAddingToCart(false)
+    }
+  }
+
+  const handleCustomImageChange = (event) => {
+    const file = event.target.files?.[0]
+    setCartMessage("")
+    setCartError("")
+
+    if (!file) {
+      setCustomImageFile(null)
+      setCustomImagePreview("")
+      return
+    }
+
+    if (!file.type.startsWith("image/")) {
+      setCustomImageFile(null)
+      setCustomImagePreview("")
+      setCartError("Please upload an image file.")
+      event.target.value = ""
+      return
+    }
+
+    if (file.size > CUSTOM_IMAGE_MAX_BYTES) {
+      setCustomImageFile(null)
+      setCustomImagePreview("")
+      setCartError("Image must be 15MB or smaller.")
+      event.target.value = ""
+      return
+    }
+
+    if (customImagePreview) {
+      URL.revokeObjectURL(customImagePreview)
+    }
+
+    setCustomImageFile(file)
+    setCustomImagePreview(URL.createObjectURL(file))
+  }
+
+  const clearCustomImage = () => {
+    if (customImagePreview) {
+      URL.revokeObjectURL(customImagePreview)
+    }
+
+    setCustomImageFile(null)
+    setCustomImagePreview("")
+
+    if (customImageInputRef.current) {
+      customImageInputRef.current.value = ""
     }
   }
 
@@ -231,11 +304,26 @@ function ProductDetails() {
         <div className="product-detail-grid">
           <div className="product-visual-card">
             <img src={image} alt={product.name} className="product-detail-image" />
+            {variantImages.length > 1 && (
+              <div className="product-image-strip" aria-label="Product images">
+                {variantImages.map((imageUrl, index) => (
+                  <button
+                    type="button"
+                    className={index === selectedImageIndex ? "selected" : ""}
+                    key={`${imageUrl}-${index}`}
+                    onClick={() => setSelectedImageIndex(index)}
+                    aria-label={`Show product image ${index + 1}`}
+                  >
+                    <img src={imageUrl} alt="" />
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           <div className="product-info-panel">
-            {product.category && (
-              <small className="product-category">{product.category}</small>
+            {categoryLabel && (
+              <small className="product-category">{categoryLabel}</small>
             )}
 
             <h1>{product.name}</h1>
@@ -252,7 +340,7 @@ function ProductDetails() {
                   <small>{variants.length} available</small>
                 </div>
 
-                <label className="variant-search" htmlFor="variantSearch">
+                {/* <label className="variant-search" htmlFor="variantSearch">
                   <LuSearch aria-hidden="true" />
                   <input
                     id="variantSearch"
@@ -262,7 +350,7 @@ function ProductDetails() {
                     placeholder="Search variants"
                     autoComplete="off"
                   />
-                </label>
+                </label> */}
 
                 <div className="variant-options" role="listbox" aria-label="Product variants">
                   {filteredVariants.length > 0 ? (
@@ -275,7 +363,10 @@ function ProductDetails() {
                           key={item.id}
                           type="button"
                           className={`variant-option${isSelected ? " selected" : ""}`}
-                          onClick={() => setSelectedVariantId(item.id)}
+                          onClick={() => {
+                            setSelectedVariantId(item.id)
+                            setSelectedImageIndex(0)
+                          }}
                           role="option"
                           aria-selected={isSelected}
                         >
@@ -299,6 +390,43 @@ function ProductDetails() {
                 ))}
               </ul>
             </div>
+
+            {isMadeJustForYou && (
+              <div className="custom-upload-card">
+                <div>
+                  <h6>Reference Image</h6>
+                  <p>Upload one image under 15MB before adding this custom product to cart.</p>
+                </div>
+
+                {customImagePreview ? (
+                  <div className="custom-upload-preview">
+                    <img src={customImagePreview} alt="Uploaded reference preview" />
+                    <div>
+                      <strong>{customImageFile?.name}</strong>
+                      <span>{((customImageFile?.size || 0) / (1024 * 1024)).toFixed(2)} MB</span>
+                    </div>
+                    <button type="button" onClick={clearCustomImage} aria-label="Remove uploaded image">
+                      <LuX />
+                    </button>
+                  </div>
+                ) : (
+                  <label className="custom-upload-dropzone" htmlFor="customReferenceImage">
+                    <LuImagePlus />
+                    <span>Choose Image</span>
+                    <small>PNG, JPG, WEBP, or HEIC up to 15MB</small>
+                  </label>
+                )}
+
+                <input
+                  id="customReferenceImage"
+                  ref={customImageInputRef}
+                  className="custom-upload-input"
+                  type="file"
+                  accept="image/*"
+                  onChange={handleCustomImageChange}
+                />
+              </div>
+            )}
 
             <div className="quantity-row">
               <span>Quantity:</span>

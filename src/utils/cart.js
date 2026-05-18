@@ -5,6 +5,12 @@ export const CART_UPDATED_EVENT = "puchi-cart-updated"
 export const formatCartPrice = (amount = 0) =>
   `\u20b9${((amount || 0) / 100).toLocaleString("en-IN")}`
 
+export const parseCartListField = (value) => {
+  if (Array.isArray(value)) return value.map(String).filter(Boolean)
+  if (!value) return []
+  return String(value).split(",").map((item) => item.trim()).filter(Boolean)
+}
+
 const notifyCartUpdated = () => {
   if (typeof window !== "undefined") {
     window.dispatchEvent(new Event(CART_UPDATED_EVENT))
@@ -85,6 +91,7 @@ export const addItemToCart = async ({
   variantId,
   quantity,
   price,
+  customImageUrl,
 }) => {
   if (!userId) {
     throw new Error("Please log in before adding items to your cart.")
@@ -96,30 +103,41 @@ export const addItemToCart = async ({
 
   const order = await getOrCreatePendingOrder(userId)
   const nextQuantity = Math.max(1, Number(quantity) || 1)
+  const hasCustomUpload = Boolean(customImageUrl)
 
-  const { data: existingItem, error: itemError } = await supabase
-    .from("order_items")
-    .select("id, quantity")
-    .eq("order_id", order.id)
-    .eq("product_id", productId)
-    .eq("variant_id", variantId)
-    .limit(1)
-    .maybeSingle()
+  let cartItem = null
 
-  if (itemError) throw itemError
-
-  if (existingItem) {
-    const { error } = await supabase
+  if (!hasCustomUpload) {
+    const { data: existingItem, error: itemError } = await supabase
       .from("order_items")
-      .update({
-        quantity: (existingItem.quantity || 0) + nextQuantity,
-        price,
-      })
-      .eq("id", existingItem.id)
+      .select("id, quantity")
+      .eq("order_id", order.id)
+      .eq("product_id", productId)
+      .eq("variant_id", variantId)
+      .limit(1)
+      .maybeSingle()
 
-    if (error) throw error
-  } else {
-    const { error } = await supabase
+    if (itemError) throw itemError
+
+    if (existingItem) {
+      const { data, error } = await supabase
+        .from("order_items")
+        .update({
+          quantity: (existingItem.quantity || 0) + nextQuantity,
+          price,
+        })
+        .eq("id", existingItem.id)
+        .select("id, order_id, product_id, variant_id, quantity, price")
+        .single()
+
+      if (error) throw error
+
+      cartItem = data
+    }
+  }
+
+  if (!cartItem) {
+    const { data, error } = await supabase
       .from("order_items")
       .insert({
         order_id: order.id,
@@ -128,14 +146,75 @@ export const addItemToCart = async ({
         quantity: nextQuantity,
         price,
       })
+      .select("id, order_id, product_id, variant_id, quantity, price")
+      .single()
 
     if (error) throw error
+
+    cartItem = data
+  }
+
+  if (hasCustomUpload) {
+    const { error } = await supabase
+      .from("custom_uploads")
+      .insert({
+        order_item_id: cartItem.id,
+        image_url: customImageUrl,
+        status: "pending",
+      })
+
+    if (error) {
+      await supabase
+        .from("order_items")
+        .delete()
+        .eq("id", cartItem.id)
+
+      await recalculateOrderTotal(order.id)
+      throw error
+    }
   }
 
   await recalculateOrderTotal(order.id)
   notifyCartUpdated()
 
-  return order
+  return {
+    order,
+    item: cartItem,
+  }
+}
+
+export const uploadCustomOrderImage = async ({ file, userId }) => {
+  if (!file) {
+    throw new Error("Please upload a reference image.")
+  }
+
+  if (!file.type.startsWith("image/")) {
+    throw new Error("Please upload an image file.")
+  }
+
+  if (file.size > 15 * 1024 * 1024) {
+    throw new Error("Image must be 15MB or smaller.")
+  }
+
+  const extension = file.name.split(".").pop()?.toLowerCase() || "jpg"
+  const safeName = `${crypto.randomUUID()}.${extension}`
+  const filePath = `${userId}/${safeName}`
+
+  const { error } = await supabase.storage
+    .from("custom-uploads")
+    .upload(filePath, file, {
+      cacheControl: "3600",
+      contentType: file.type,
+      upsert: false,
+    })
+
+  if (error) throw error
+
+  const { data } = supabase.storage
+    .from("custom-uploads")
+    .getPublicUrl(filePath)
+
+  return data.publicUrl
 }
 
 export const getCartItemCount = async (userId) => {
@@ -173,16 +252,16 @@ export const fetchCart = async (userId) => {
       quantity,
       price,
       products (
-        id,
-        name,
-        category
+        *
       ),
       product_variants (
+        *
+      ),
+      custom_uploads (
         id,
-        name,
         image_url,
-        price,
-        discount_price
+        status,
+        notes
       )
     `)
     .eq("order_id", order.id)

@@ -1,13 +1,21 @@
 import './product-card.css'
 import { NavLink } from 'react-router-dom'
 
+const parseListField = (value) => {
+  if (Array.isArray(value)) return value.filter(Boolean)
+  if (!value) return []
+  return String(value).split(',').map((item) => item.trim()).filter(Boolean)
+}
+
 function ProductCard({ product, onClick }) {
   const variants = product.product_variants || []
   const minPrice = variants.length
     ? Math.min(...variants.map(v => v.discount_price || v.price))
     : 0
-  const formattedPrice = `₹${(minPrice / 100).toLocaleString("en-IN")}`
+  const formattedPrice = `\u20b9${(minPrice / 100).toLocaleString("en-IN")}`
+  const categories = parseListField(product.categories || product.category)
   const image =
+    parseListField(variants[0]?.image_urls)[0] ||
     variants[0]?.image_url ||
     product.image_url ||
     "https://via.placeholder.com/300"
@@ -22,9 +30,9 @@ function ProductCard({ product, onClick }) {
         />
       </div>
 
-      {product.category && (
+      {categories.length > 0 && (
         <small className="text-primary">
-          {product.category}
+          {categories.join(", ")}
         </small>
       )}
 
@@ -61,4 +69,3 @@ function ProductCard({ product, onClick }) {
 }
 
 export default ProductCard
-

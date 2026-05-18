@@ -19,16 +19,9 @@ function Home() {
       const { data, error } = await withRequestTimeout(supabase
         .from("products")
         .select(`
-          id,
-          name,
-          category,
-          is_active,
+          *,
           product_variants (
-            id,
-            name,
-            price,
-            discount_price,
-            image_url
+            *
           )
         `)
         .eq("is_active", true))
