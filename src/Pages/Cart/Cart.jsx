@@ -8,7 +8,7 @@ import {
   removeCartItem,
   updateCartItemQuantity,
 } from "../../utils/cart"
-import { openCashfreeCheckout } from "../../utils/cashfree"
+import { getFunctionErrorMessage, openCashfreeCheckout } from "../../utils/cashfree"
 import { supabase } from "../../utils/supabase"
 import "./cart.css"
 
@@ -150,9 +150,10 @@ function Cart() {
       await openCashfreeCheckout(data.payment_session_id)
     } catch (error) {
       console.error("Checkout error:", error)
+      const functionMessage = await getFunctionErrorMessage(error)
+
       setErrorMessage(
-        error.context?.error ||
-        error.message ||
+        functionMessage ||
         "We could not start checkout. Please try again.",
       )
       setIsCheckingOut(false)

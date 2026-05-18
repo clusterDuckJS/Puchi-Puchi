@@ -32,3 +32,14 @@ export const openCashfreeCheckout = async (paymentSessionId) => {
     redirectTarget: "_self",
   })
 }
+
+export const getFunctionErrorMessage = async (error) => {
+  if (!error) return ""
+
+  if (error.context instanceof Response) {
+    const errorBody = await error.context.json().catch(() => null)
+    return errorBody?.error || errorBody?.message || error.message || ""
+  }
+
+  return error.context?.error || error.message || ""
+}

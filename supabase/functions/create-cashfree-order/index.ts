@@ -24,6 +24,14 @@ const jsonResponse = (body: Record<string, unknown>, status = 200) =>
     },
   })
 
+const getCashfreeErrorMessage = (data: Record<string, unknown>) => {
+  if (typeof data.message === "string") return data.message
+  if (typeof data.error === "string") return data.error
+  if (typeof data.type === "string") return data.type
+
+  return "Cashfree order creation failed."
+}
+
 const normalizePhone = (phone?: string | null) => phone?.replace(/\D/g, "") || ""
 
 serve(async (request) => {
@@ -178,7 +186,8 @@ serve(async (request) => {
   if (!cashfreeResponse.ok) {
     return jsonResponse(
       {
-        error: cashfreeData.message || cashfreeData.error || "Cashfree order creation failed.",
+        error: getCashfreeErrorMessage(cashfreeData),
+        cashfree: cashfreeData,
       },
       cashfreeResponse.status,
     )
