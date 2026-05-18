@@ -5,6 +5,7 @@ import Section from '../../Components/Section/Section'
 import { LuArrowRight, LuBox, LuCamera, LuCheck, LuWandSparkles } from 'react-icons/lu'
 import ProductCard from '../../Components/ProductCard/ProductCard'
 import { supabase } from '../../utils/supabase.js'
+import { withRequestTimeout } from '../../utils/request.js'
 import { useNavigate } from 'react-router-dom'
 
 function Home() {
@@ -12,8 +13,10 @@ function Home() {
   const [products, setProducts] = useState([])
 
   useEffect(() => {
+    let isCurrent = true
+
     const fetchProducts = async () => {
-      const { data, error } = await supabase
+      const { data, error } = await withRequestTimeout(supabase
         .from("products")
         .select(`
           id,
@@ -28,16 +31,26 @@ function Home() {
             image_url
           )
         `)
-        .eq("is_active", true)
+        .eq("is_active", true))
+
+      if (!isCurrent) return
 
       if (error) {
         console.error("Error fetching:", error)
       } else {
-        setProducts(data)
+        setProducts(data || [])
       }
     }
 
-    fetchProducts()
+    fetchProducts().catch((error) => {
+      if (isCurrent) {
+        console.error("Error fetching:", error)
+      }
+    })
+
+    return () => {
+      isCurrent = false
+    }
   }, [])
 
   const newArrivals = products.slice(0, 3)

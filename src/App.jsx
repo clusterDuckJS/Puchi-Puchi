@@ -66,35 +66,9 @@ function App() {
   };
 
   useEffect(() => {
-    let isCurrent = true;
-
-    supabase.auth.getSession().then(async ({ data }) => {
-      if (!isCurrent) return;
-
-      setSession(data.session);
-
-      if (data.session?.user) {
-        await createProfile(data.session.user);
-        await fetchProfile(data.session.user.id);
-      }
-
-    }).catch((error) => {
-      console.error("Session error:", error.message);
-
-      if (isCurrent) {
-        setSession(null);
-        setProfile(null);
-      }
-    });
-
     const { data: listener } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        setSession(session);
-
-        if (event === "SIGNED_IN" && session?.user) {
-          await createProfile(session.user);
-          await fetchProfile(session.user.id);
-        }
+      (event, nextSession) => {
+        setSession(nextSession);
 
         if (event === "SIGNED_OUT") {
           setProfile(null);
@@ -105,10 +79,40 @@ function App() {
     );
 
     return () => {
-      isCurrent = false;
       listener.subscription.unsubscribe();
     };
   }, [navigate]);
+
+  useEffect(() => {
+    let isCurrent = true;
+    const user = session?.user;
+
+    if (!user) {
+      return () => {
+        isCurrent = false;
+      };
+    }
+
+    const syncProfile = async () => {
+      await createProfile(user);
+
+      if (isCurrent) {
+        await fetchProfile(user.id);
+      }
+    };
+
+    syncProfile().catch((error) => {
+      console.error("Profile sync error:", error.message);
+
+      if (isCurrent) {
+        setProfile(null);
+      }
+    });
+
+    return () => {
+      isCurrent = false;
+    };
+  }, [session?.user]);
 
   return (
     <>

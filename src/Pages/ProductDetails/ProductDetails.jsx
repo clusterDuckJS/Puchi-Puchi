@@ -5,6 +5,7 @@ import { LuArrowLeft, LuHeart, LuMinus, LuPlus, LuSearch, LuShoppingBag } from '
 import { supabase } from '../../utils/supabase'
 import ProductCard from '../../Components/ProductCard/ProductCard'
 import { addItemToCart, getCurrentUserId } from '../../utils/cart'
+import { isTimeoutError, withRequestTimeout } from '../../utils/request'
 
 function ProductDetails() {
   const { id } = useParams()
@@ -15,6 +16,7 @@ function ProductDetails() {
   const [selectedVariantId, setSelectedVariantId] = useState(null)
   const [variantSearch, setVariantSearch] = useState("")
   const [loading, setLoading] = useState(true)
+  const [productError, setProductError] = useState("")
   const [isAddingToCart, setIsAddingToCart] = useState(false)
   const [cartMessage, setCartMessage] = useState("")
   const [cartError, setCartError] = useState("")
@@ -31,9 +33,10 @@ function ProductDetails() {
 
       setLoading(true)
       setProduct(null)
+      setProductError("")
 
       try {
-        const { data, error } = await supabase
+        const { data, error } = await withRequestTimeout(supabase
           .from("products")
           .select(`
             id,
@@ -51,7 +54,7 @@ function ProductDetails() {
             )
           `)
           .eq("id", id)
-          .single()
+          .single())
 
         if (!isCurrent) return
 
@@ -65,6 +68,9 @@ function ProductDetails() {
         if (isCurrent) {
           console.error(error)
           setProduct(false)
+          if (isTimeoutError(error)) {
+            setProductError("This product is taking too long to load. Please refresh in a moment.")
+          }
         }
       } finally {
         if (isCurrent) {
@@ -94,7 +100,7 @@ function ProductDetails() {
 
     const fetchRelatedProducts = async () => {
       try {
-        const { data, error } = await supabase
+        const { data, error } = await withRequestTimeout(supabase
           .from("products")
           .select(`
             id,
@@ -111,7 +117,7 @@ function ProductDetails() {
           `)
           .eq("is_active", true)
           .neq("id", id)
-          .limit(3)
+          .limit(3))
 
         if (!isCurrent) return
 
@@ -149,7 +155,7 @@ function ProductDetails() {
         <NavLink to="/shop" className="product-back-link">
           <LuArrowLeft /> Back to Shop
         </NavLink>
-        <p className="product-status">Product not found</p>
+        <p className="product-status">{productError || "Product not found"}</p>
       </section>
     )
   }

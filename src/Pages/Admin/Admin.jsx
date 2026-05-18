@@ -17,6 +17,7 @@ import {
 } from "react-icons/lu";
 import { NavLink, Route, Routes, useNavigate } from "react-router-dom";
 import { supabase } from "../../utils/supabase";
+import { isTimeoutError, withRequestTimeout } from "../../utils/request";
 import "./admin.css";
 
 const currency = new Intl.NumberFormat("en-IN", {
@@ -466,38 +467,48 @@ function ProductsPage() {
     setLoading(true);
     setError("");
 
-    const { data, error: fetchError } = await supabase
-      .from("products")
-      .select(`
-        id,
-        name,
-        description,
-        category,
-        is_custom,
-        is_active,
-        is_featured,
-        is_best_seller,
-        is_new_arrival,
-        created_at,
-        product_variants (
+    try {
+      const { data, error: fetchError } = await withRequestTimeout(supabase
+        .from("products")
+        .select(`
           id,
           name,
-          price,
-          discount_price,
-          stock,
-          image_url,
+          description,
+          category,
+          is_custom,
           is_active,
-          created_at
-        )
-      `)
-      .order("created_at", { ascending: false });
+          is_featured,
+          is_best_seller,
+          is_new_arrival,
+          created_at,
+          product_variants (
+            id,
+            name,
+            price,
+            discount_price,
+            stock,
+            image_url,
+            is_active,
+            created_at
+          )
+        `)
+        .order("created_at", { ascending: false }));
 
-    if (fetchError) {
-      console.error("Admin products fetch error:", fetchError);
-      setError(fetchError.message);
+      if (fetchError) {
+        console.error("Admin products fetch error:", fetchError);
+        setError(fetchError.message);
+        setProducts([]);
+      } else {
+        setProducts(data || []);
+      }
+    } catch (error) {
+      console.error("Admin products fetch error:", error);
+      setError(
+        isTimeoutError(error)
+          ? "Products are taking too long to load. Please refresh in a moment."
+          : error.message
+      );
       setProducts([]);
-    } else {
-      setProducts(data || []);
     }
 
     setLoading(false);

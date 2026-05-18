@@ -9,6 +9,7 @@ import {
   updateCartItemQuantity,
 } from "../../utils/cart"
 import { getFunctionErrorMessage, openCashfreeCheckout } from "../../utils/cashfree"
+import { isTimeoutError, withRequestTimeout } from "../../utils/request"
 import { supabase } from "../../utils/supabase"
 import "./cart.css"
 
@@ -46,7 +47,7 @@ function Cart() {
     setErrorMessage("")
 
     try {
-      const currentUserId = await getCurrentUserId()
+      const currentUserId = await withRequestTimeout(getCurrentUserId())
       setUserId(currentUserId)
 
       if (!currentUserId) {
@@ -55,12 +56,16 @@ function Cart() {
         return
       }
 
-      const cart = await fetchCart(currentUserId)
+      const cart = await withRequestTimeout(fetchCart(currentUserId))
       setOrder(cart.order)
       setItems(cart.items)
     } catch (error) {
       console.error("Cart load error:", error)
-      setErrorMessage("We could not load your cart right now.")
+      setErrorMessage(
+        isTimeoutError(error)
+          ? "Your cart is taking too long to load. Please refresh in a moment."
+          : "We could not load your cart right now."
+      )
       setOrder(null)
       setItems([])
     } finally {
@@ -130,14 +135,14 @@ function Cart() {
     setErrorMessage("")
 
     try {
-      const { data, error } = await supabase.functions.invoke("create-cashfree-order", {
+      const { data, error } = await withRequestTimeout(supabase.functions.invoke("create-cashfree-order", {
         body: {
           orderId: order.id,
           shippingMethod,
           hasInsurance,
           craftingSpeed,
         },
-      })
+      }))
 
       if (error) {
         throw error

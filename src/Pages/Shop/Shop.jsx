@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import ProductCard from '../../Components/ProductCard/ProductCard'
 import { supabase } from '../../utils/supabase'
+import { isTimeoutError, withRequestTimeout } from '../../utils/request'
 import './shop.css'
 
 const normalizeCategory = (category) => category?.trim().toLowerCase() || ''
@@ -32,7 +33,7 @@ function Shop() {
       setErrorMessage('')
 
       try {
-        const { data, error } = await supabase
+        const { data, error } = await withRequestTimeout(supabase
           .from('products')
           .select(`
             id,
@@ -47,7 +48,7 @@ function Shop() {
               image_url
             )
           `)
-          .eq('is_active', true)
+          .eq('is_active', true))
 
         if (!isCurrent) return
 
@@ -61,7 +62,11 @@ function Shop() {
       } catch (error) {
         if (isCurrent) {
           console.error('Shop products error:', error)
-          setErrorMessage('We could not load the collection right now.')
+          setErrorMessage(
+            isTimeoutError(error)
+              ? 'The collection is taking too long to load. Please refresh in a moment.'
+              : 'We could not load the collection right now.'
+          )
           setProducts([])
         }
       } finally {

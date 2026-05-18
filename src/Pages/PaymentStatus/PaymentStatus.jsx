@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react"
 import { NavLink, useSearchParams } from "react-router-dom"
 import { LuCircleAlert, LuCircleCheck, LuLoaderCircle } from "react-icons/lu"
+import { isTimeoutError, withRequestTimeout } from "../../utils/request"
 import { supabase } from "../../utils/supabase"
 import "./payment-status.css"
 
@@ -40,9 +41,9 @@ function PaymentStatus() {
       }
 
       try {
-        const { data, error } = await supabase.functions.invoke("verify-cashfree-order", {
+        const { data, error } = await withRequestTimeout(supabase.functions.invoke("verify-cashfree-order", {
           body: { orderId },
-        })
+        }))
 
         if (error) throw error
 
@@ -53,7 +54,11 @@ function PaymentStatus() {
         console.error("Payment verification error:", error)
 
         if (isCurrent) {
-          setErrorMessage(error.message || "We could not verify this payment.")
+          setErrorMessage(
+            isTimeoutError(error)
+              ? "Payment verification is taking too long. Please refresh in a moment."
+              : error.message || "We could not verify this payment."
+          )
         }
       } finally {
         if (isCurrent) {
