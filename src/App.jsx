@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react';
 import Header from './Components/Header/Header'
 import Home from './Pages/Home/Home'
-import { Route, Routes, useNavigate } from 'react-router-dom';
+import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import Shop from './Pages/Shop/Shop';
 import About from './Pages/About/About';
 import Reviews from './Pages/Reviews/Reviews';
@@ -12,6 +12,8 @@ import ProductDetails from './Pages/ProductDetails/ProductDetails';
 import { supabase } from './utils/supabase';
 import AuthForm from './Components/Auth/AuthForm';
 import Profile from './Pages/Profile/Profile';
+import AdminLogin from './Pages/Admin/AdminLogin';
+import Admin from './Pages/Admin/Admin';
 
 function App() {
   const [session, setSession] = useState(null);
@@ -19,6 +21,8 @@ function App() {
   const [loading, setLoading] = useState(true);
 
   const navigate = useNavigate();
+  const location = useLocation();
+  const isAdminRoute = location.pathname.startsWith("/admin");
 
   // 🔹 create profile
   const createProfile = async (user) => {
@@ -55,8 +59,11 @@ function App() {
 
     if (error) {
       console.error("Fetch profile error:", error.message);
+      setProfile(null);
+      return null;
     } else {
       setProfile(data);
+      return data;
     }
   };
 
@@ -85,7 +92,8 @@ function App() {
 
         if (event === "SIGNED_OUT") {
           setProfile(null);
-          navigate("/");
+          const isSigningOutFromAdmin = window.location.pathname.startsWith("/admin");
+          navigate(isSigningOutFromAdmin ? "/admin/login" : "/");
         }
       }
     );
@@ -99,11 +107,13 @@ function App() {
   // ✅ MAIN APP (always render layout)
   return (
     <>
-      <Header
-        key={session?.user?.id ?? "guest"}
-        user={session?.user}
-        profile={profile}
-      />
+      {!isAdminRoute && (
+        <Header
+          key={session?.user?.id ?? "guest"}
+          user={session?.user}
+          profile={profile}
+        />
+      )}
 
       <Routes>
         <Route path="/" element={<Home />} />
@@ -126,9 +136,29 @@ function App() {
             )
           }
         />
+        <Route
+          path="/admin/login"
+          element={
+            profile?.role === "admin" ? (
+              <Navigate to="/admin" replace />
+            ) : (
+              <AdminLogin />
+            )
+          }
+        />
+        <Route
+          path="/admin/*"
+          element={
+            session?.user && profile?.role === "admin" ? (
+              <Admin />
+            ) : (
+              <Navigate to="/admin/login" replace />
+            )
+          }
+        />
       </Routes>
 
-      <Footer />
+      {!isAdminRoute && <Footer />}
     </>
   );
 }

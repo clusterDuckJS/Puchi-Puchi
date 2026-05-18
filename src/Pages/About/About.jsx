@@ -1,5 +1,5 @@
 import './about.css'
-import { LuHeart, LuSparkles, LuStar, LuUsers } from 'react-icons/lu'
+import { LuHeart, LuIndianRupee, LuSparkles, LuStar, LuUsers } from 'react-icons/lu'
 import LOGO from '../../assets/puchi_logo_tran.svg'
 
 function About() {
@@ -9,7 +9,7 @@ function About() {
     "This whole adventure is a one-person passion project, powered by a whole lot of love for character design and the quiet, cozy humming of my two very hardworking co-workers my printers, Mars and Saturn.",
     "At Puchi Puchi, I specialize in bringing your ideas to life as custom, personalized resin figurines. Whether it’s an adorable, big-headed chibi or a stylized pop figure of someone you love, my absolute favorite thing is turning big imaginations into tiny, tangible pieces of art.",
     "Because my workshop is just me and my table, there is no massive assembly line. Every single little figure that leaves my hands has been meticulously printed, perfectly cured, and carefully checked by yours truly. It means a little bit of creative chaos, a few late nights, and an endless amount of care poured into every single order.",
-    "When you take home a Puchi Puchi figure, you aren't just getting a toy—you're getting a little piece of dining-table magic, made just for you.",
+    "When you take home a Puchi Puchi figure, you aren't just getting a toy, you're getting a little piece of dining-table magic, made just for you.",
     "Thank you so much for stopping by, supporting handmade, and helping my little tabletop dream grow! 💖",
   ]
 
@@ -17,22 +17,22 @@ function About() {
     {
       icon: <LuHeart />,
       title: "Made with Love",
-      text: "Every figure is crafted with genuine care and passion.",
+      text: "Every figure is crafted with genuine care and passion",
     },
     {
       icon: <LuStar />,
       title: "Quality First",
-      text: "Thoughtful printing, curing, and checks for lasting cuteness.",
+      text: "Thoughtful printing, curing, and checks for lasting cuteness",
     },
     {
       icon: <LuSparkles />,
       title: "Unique Designs",
-      text: "Personalized characters you won't find anywhere else.",
+      text: "Personalized characters you won't find anywhere else",
     },
     {
-      icon: <LuUsers />,
-      title: "Community",
-      text: "Building a family of kawaii lovers worldwide.",
+      icon: <LuIndianRupee />,
+      title: "Affordable Joy",
+      text: "Bringing your dream characters to life at a friendly price",
     },
   ]
 
