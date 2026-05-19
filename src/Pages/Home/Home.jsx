@@ -10,29 +10,46 @@ import { useNavigate } from 'react-router-dom'
 
 function Home() {
   const navigate = useNavigate()
-  const [products, setProducts] = useState([])
+  const [newArrivals, setNewArrivals] = useState([])
+  const [bestSellers, setBestSellers] = useState([])
 
   useEffect(() => {
     let isCurrent = true
 
     const fetchProducts = async () => {
-      const { data, error } = await withRequestTimeout(supabase
-        .from("products")
-        .select(`
-          *,
-          product_variants (
-            *
-          )
-        `)
-        .eq("is_active", true))
+      const productFields = `
+        *,
+        product_variants (
+          *
+        )
+      `
+
+      const [newArrivalResult, bestSellerResult] = await Promise.all([
+        withRequestTimeout(supabase
+          .from("products")
+          .select(productFields)
+          .eq("is_active", true)
+          .eq("is_new_arrival", true)
+          .order("created_at", { ascending: false })
+          .limit(3)),
+        withRequestTimeout(supabase
+          .from("products")
+          .select(productFields)
+          .eq("is_active", true)
+          .eq("is_best_seller", true)
+          .order("created_at", { ascending: false })
+          .limit(3)),
+      ])
 
       if (!isCurrent) return
 
-      if (error) {
-        console.error("Error fetching:", error)
-      } else {
-        setProducts(data || [])
+      if (newArrivalResult.error || bestSellerResult.error) {
+        console.error("Error fetching:", newArrivalResult.error || bestSellerResult.error)
+        return
       }
+
+      setNewArrivals(newArrivalResult.data || [])
+      setBestSellers(bestSellerResult.data || [])
     }
 
     fetchProducts().catch((error) => {
@@ -45,9 +62,6 @@ function Home() {
       isCurrent = false
     }
   }, [])
-
-  const newArrivals = products.slice(0, 3)
-  const bestSellers = products.length > 3 ? products.slice(3, 6) : products.slice(0, 3)
 
   return (
     <div className='container home'>
