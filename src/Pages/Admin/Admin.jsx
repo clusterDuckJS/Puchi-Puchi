@@ -186,6 +186,9 @@ function OverviewPage() {
             paid_at,
             tracking_id,
             dispatched_at,
+            customer_name,
+            customer_email,
+            customer_phone,
             created_at,
             order_items (
               quantity,
@@ -335,7 +338,7 @@ function OverviewPage() {
           {recentOrders.length > 0 ? (
             <div className="admin-order-list">
               {recentOrders.map((order) => {
-                const customer = getProfileName(profilesById[order.user_id]);
+                const customer = order.customer_name || getProfileName(profilesById[order.user_id]);
 
                 return (
               <div className="admin-order-row" key={order.id}>
@@ -383,6 +386,9 @@ function OrdersPage() {
           paid_at,
           tracking_id,
           dispatched_at,
+          customer_name,
+          customer_email,
+          customer_phone,
           created_at,
           order_items (
             id,
@@ -517,8 +523,9 @@ function OrdersPage() {
     const name = [profile.first_name, profile.last_name].filter(Boolean).join(" ");
 
     return {
-      name: name || "Customer",
-      email: profile.email || "No email saved",
+      name: order.customer_name || name || "Customer name missing",
+      email: order.customer_email || profile.email || "Email missing",
+      phone: order.customer_phone || profile.phone || "Phone missing",
     };
   }, [profilesById]);
 
@@ -544,6 +551,7 @@ function OrdersPage() {
         order.display_id,
         customer.name,
         customer.email,
+        customer.phone,
         order.status,
         order.tracking_id,
         itemsText,
@@ -592,9 +600,10 @@ function OrdersPage() {
               return (
                 <tr key={order.id}>
                   <td>#{order.display_id}</td>
-                  <td>
+                  <td className="admin-customer-cell">
                     <p>{customer.name}</p>
                     <span>{customer.email}</span>
+                    <span>{customer.phone}</span>
                   </td>
                   <td>
                     <div className="admin-order-items">

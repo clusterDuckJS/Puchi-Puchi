@@ -180,6 +180,7 @@ serve(async (request) => {
 
   const profileName = [profile.first_name, profile.last_name].filter(Boolean).join(" ")
   const customerName = address.full_name || profileName
+  const customerEmail = profile.email || user.email || null
   const cashfreeOrderId = `puchi_${order.id.replaceAll("-", "")}_${Date.now()}`
   const cashfreePayload = {
     order_id: cashfreeOrderId,
@@ -188,7 +189,7 @@ serve(async (request) => {
     customer_details: {
       customer_id: user.id,
       customer_name: customerName,
-      customer_email: profile.email || user.email,
+      customer_email: customerEmail,
       customer_phone: customerPhone,
     },
     order_meta: {
@@ -228,6 +229,15 @@ serve(async (request) => {
       cashfreeResponse.status,
     )
   }
+
+  await serviceClient
+    .from("orders")
+    .update({
+      customer_name: customerName || null,
+      customer_email: customerEmail,
+      customer_phone: customerPhone || null,
+    })
+    .eq("id", order.id)
 
   return jsonResponse({
     order_id: cashfreeData.order_id,

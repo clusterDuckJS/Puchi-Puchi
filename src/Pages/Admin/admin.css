@@ -400,6 +400,19 @@
   font-weight: 700;
 }
 
+.admin-customer-cell {
+  min-width: 12rem;
+}
+
+.admin-customer-cell p,
+.admin-customer-cell span {
+  display: block;
+}
+
+.admin-customer-cell span + span {
+  margin-top: 0.18rem;
+}
+
 .admin-table-card td span {
   color: rgb(83 45 51 / 62%);
   font-size: 0.82rem;

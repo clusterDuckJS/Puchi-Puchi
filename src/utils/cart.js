@@ -12,7 +12,7 @@ export const parseCartListField = (value) => {
   return String(value).split(",").map((item) => item.trim()).filter(Boolean)
 }
 
-const notifyCartUpdated = () => {
+export const notifyCartUpdated = () => {
   if (typeof window !== "undefined") {
     window.dispatchEvent(new Event(CART_UPDATED_EVENT))
   }

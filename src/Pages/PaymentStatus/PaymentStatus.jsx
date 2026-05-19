@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react"
 import { NavLink, useSearchParams } from "react-router-dom"
 import { LuCircleAlert, LuCircleCheck, LuLoaderCircle } from "react-icons/lu"
+import { notifyCartUpdated } from "../../utils/cart"
 import { isTimeoutError, withRequestTimeout } from "../../utils/request"
 import { supabase } from "../../utils/supabase"
 import "./payment-status.css"
@@ -49,6 +50,10 @@ function PaymentStatus() {
 
         if (isCurrent) {
           setResult(data)
+
+          if (data?.order_status === "PAID") {
+            notifyCartUpdated()
+          }
         }
       } catch (error) {
         console.error("Payment verification error:", error)

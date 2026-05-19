@@ -47,9 +47,38 @@ function Header({ profile, user }) {
     refreshCartCount();
     window.addEventListener(CART_UPDATED_EVENT, refreshCartCount);
 
+    const channel = user?.id
+      ? supabase
+        .channel(`header-cart-${user.id}`)
+        .on(
+          "postgres_changes",
+          {
+            event: "*",
+            schema: "public",
+            table: "orders",
+            filter: `user_id=eq.${user.id}`,
+          },
+          refreshCartCount,
+        )
+        .on(
+          "postgres_changes",
+          {
+            event: "*",
+            schema: "public",
+            table: "order_items",
+          },
+          refreshCartCount,
+        )
+        .subscribe()
+      : null;
+
     return () => {
       isCurrent = false;
       window.removeEventListener(CART_UPDATED_EVENT, refreshCartCount);
+
+      if (channel) {
+        supabase.removeChannel(channel);
+      }
     };
   }, [user?.id]);
 
