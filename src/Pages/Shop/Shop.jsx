@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import ProductCard from '../../Components/ProductCard/ProductCard'
 import { supabase } from '../../utils/supabase'
 import { isTimeoutError, withRequestTimeout } from '../../utils/request'
@@ -28,6 +28,8 @@ const formatCategory = (category) => {
 
 function Shop() {
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const searchTerm = searchParams.get('search')?.trim() || ''
   const [products, setProducts] = useState([])
   const [selectedCategory, setSelectedCategory] = useState('all')
   const [loading, setLoading] = useState(true)
@@ -104,12 +106,26 @@ function Shop() {
   }, [products])
 
   const filteredProducts = useMemo(() => {
-    if (selectedCategory === 'all') return products
+    const normalizedSearchTerm = searchTerm.toLowerCase()
 
-    return products.filter((product) => (
-      getProductCategories(product).some((category) => normalizeCategory(category) === selectedCategory)
-    ))
-  }, [products, selectedCategory])
+    return products.filter((product) => {
+      const matchesCategory = selectedCategory === 'all' || (
+        getProductCategories(product).some((category) => normalizeCategory(category) === selectedCategory)
+      )
+
+      if (!matchesCategory) return false
+      if (!normalizedSearchTerm) return true
+
+      const searchableText = [
+        product.name,
+        product.description,
+        ...getProductCategories(product),
+        ...(product.product_variants || []).map((variant) => variant.name),
+      ].filter(Boolean).join(' ').toLowerCase()
+
+      return searchableText.includes(normalizedSearchTerm)
+    })
+  }, [products, selectedCategory, searchTerm])
 
   return (
     <main className="shop-page">
@@ -121,6 +137,17 @@ function Shop() {
       </section>
 
       <section className="shop-collection" aria-label="Product collection">
+        {searchTerm && (
+          <div className="shop-search-summary">
+            <p>
+              Search results for <strong>{searchTerm}</strong>
+            </p>
+            <button type="button" onClick={() => setSearchParams({})}>
+              Clear
+            </button>
+          </div>
+        )}
+
         {categories.length > 1 && (
           <div className="shop-filter-row" aria-label="Filter products by category">
             {categories.map((category) => (
@@ -154,7 +181,11 @@ function Shop() {
         )}
 
         {!loading && !errorMessage && filteredProducts.length === 0 && (
-          <p className="shop-status">No figurines found in this collection yet.</p>
+          <p className="shop-status">
+            {searchTerm
+              ? `No figurines match "${searchTerm}" yet.`
+              : 'No figurines found in this collection yet.'}
+          </p>
         )}
 
         {!loading && !errorMessage && filteredProducts.length > 0 && (

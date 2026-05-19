@@ -6,6 +6,7 @@ import Shop from './Pages/Shop/Shop';
 import About from './Pages/About/About';
 import Reviews from './Pages/Reviews/Reviews';
 import Faq from './Pages/Faq/Faq';
+import Gallery from './Pages/Gallery/Gallery';
 import Footer from './Components/Footer/Footer';
 import ProductDetails from './Pages/ProductDetails/ProductDetails';
 import { supabase } from './utils/supabase';
@@ -160,6 +161,8 @@ function App() {
         <Route path="/cart" element={<Cart />} />
         <Route path="/payment-status" element={<PaymentStatus />} />
         <Route path="/reviews" element={<Reviews />} />
+        <Route path="/reviews/new" element={<Reviews />} />
+        <Route path="/gallery" element={<Gallery />} />
         <Route path="/faq" element={<Faq />} />
         <Route
           path="/profile"

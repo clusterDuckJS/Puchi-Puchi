@@ -29,6 +29,40 @@
     padding: 0 2rem 7rem;
 }
 
+.shop-search-summary {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.9rem;
+    width: min(100%, 38rem);
+    margin: 0 auto 1.35rem;
+    color: #6f4d58;
+    font-size: 0.98rem;
+}
+
+.shop-search-summary p {
+    margin: 0;
+}
+
+.shop-search-summary strong {
+    color: #442632;
+}
+
+.shop-search-summary button {
+    min-height: 2.15rem;
+    padding: 0.45rem 0.85rem;
+    border: 1px solid #f0c6d3;
+    background: #fffafd;
+    color: var(--color-primary);
+    font-size: 0.88rem;
+    font-weight: 700;
+}
+
+.shop-search-summary button:hover {
+    border-color: var(--color-primary);
+    background: rgb(221 95 137 / 8%);
+}
+
 .shop-filter-row {
     display: flex;
     flex-wrap: wrap;
@@ -171,6 +205,13 @@
         overflow-x: auto;
         flex-wrap: nowrap;
         padding-bottom: 0.35rem;
+    }
+
+    .shop-search-summary {
+        justify-content: space-between;
+        gap: 0.75rem;
+        margin-bottom: 1rem;
+        font-size: 0.92rem;
     }
 
     .shop-filter-pill {

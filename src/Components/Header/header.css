@@ -2,9 +2,9 @@ header.site-header {
     position: sticky;
     top: 0;
     display: grid;
-    grid-template-columns: minmax(170px, 1fr) auto minmax(260px, 1fr);
+    grid-template-columns: minmax(150px, 1fr) auto minmax(250px, 1fr);
     align-items: center;
-    gap: 2.25rem;
+    gap: clamp(1rem, 2vw, 2.25rem);
     background-color: rgb(255 245 247 / 94%);
     backdrop-filter: blur(10px);
     z-index: 100;
@@ -81,8 +81,46 @@ header.site-header {
     display: flex;
     align-items: center;
     justify-content: flex-end;
-    gap: 1rem;
+    gap: clamp(0.65rem, 1.15vw, 1rem);
     min-width: 0;
+}
+
+.header-search {
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.45rem;
+    min-width: 1.35rem;
+}
+
+.header-search.open {
+    flex: 0 1 13rem;
+    min-width: 0;
+}
+
+.header-search input {
+    box-sizing: border-box;
+    width: clamp(8rem, 14vw, 12rem);
+    max-width: 100%;
+    min-height: 2.25rem;
+    padding: 0.45rem 0.8rem;
+    border: 1px solid #f0c6d3;
+    border-radius: 999px;
+    background: #fffafd;
+    color: #4b2730;
+    font: inherit;
+    font-size: 0.92rem;
+    outline: none;
+    box-shadow: 0 10px 24px rgb(221 95 137 / 8%);
+}
+
+.header-search input::placeholder {
+    color: #a9848f;
+}
+
+.header-search input:focus {
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 3px rgb(221 95 137 / 14%);
 }
 
 .user-greeting,
@@ -186,12 +224,43 @@ header.site-header {
 
 @media screen and (max-width: 1024px) {
     header.site-header {
-        padding: 1rem 4rem;
+        padding: 1rem 3rem;
         grid-template-columns: auto 1fr auto;
     }
 
     .header-links {
-        gap: 1.5rem;
+        gap: 1rem;
+    }
+
+    .nav-link {
+        font-size: 0.9rem;
+    }
+
+    .header-search.open {
+        flex-basis: 10rem;
+    }
+
+    .header-search input {
+        width: clamp(7.5rem, 16vw, 10rem);
+    }
+
+    .user-greeting,
+    .signup-btn {
+        padding-inline: 0.75rem;
+    }
+}
+
+@media screen and (max-width: 900px) {
+    header.site-header {
+        padding-inline: 2rem;
+    }
+
+    .header-account {
+        gap: 0.6rem;
+    }
+
+    .header-search.open {
+        flex-basis: 8.5rem;
     }
 }
 
@@ -282,6 +351,7 @@ header.site-header {
         justify-content: flex-start;
         flex-wrap: wrap;
         gap: 0.85rem;
+        width: 100%;
         padding-top: 0.9rem;
         border-top: 1px solid #f3e2e5;
     }
@@ -300,6 +370,19 @@ header.site-header {
         width: 2.4rem;
         height: 2.4rem;
         justify-content: center;
+    }
+
+    .header-search.open {
+        order: -1;
+        flex: 1 1 100%;
+        justify-content: flex-start;
+        width: 100%;
+    }
+
+    .header-search.open input {
+        flex: 1 1 auto;
+        width: 100%;
+        min-width: 0;
     }
 
     .login-link,

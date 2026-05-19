@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { LuLogOut, LuMenu, LuSearch, LuShoppingBag, LuUser, LuX } from "react-icons/lu";
-import { NavLink, useNavigate } from "react-router-dom";
+import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import LOGO from "../../assets/puchi_logo_tran.svg";
 import { CART_UPDATED_EVENT, getCartItemCount } from "../../utils/cart";
 import { supabase } from "../../utils/supabase";
@@ -10,10 +10,14 @@ import "./header.css";
 
 function Header({ profile, user }) {
   const navigate = useNavigate();
+  const location = useLocation();
   const [openAuth, setOpenAuth] = useState(false);
   const [openMenu, setOpenMenu] = useState(false);
+  const [openSearch, setOpenSearch] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [cartCount, setCartCount] = useState(0);
+  const searchInputRef = useRef(null);
   const firstName = profile?.first_name || user?.user_metadata?.first_name;
 
   useEffect(() => {
@@ -49,18 +53,70 @@ function Header({ profile, user }) {
     };
   }, [user?.id]);
 
+  useEffect(() => {
+    if (openSearch) {
+      searchInputRef.current?.focus();
+    }
+  }, [openSearch]);
+
+  useEffect(() => {
+    if (location.pathname !== "/shop") return;
+
+    const query = new URLSearchParams(location.search).get("search") || "";
+    setSearchQuery(query);
+
+    if (query) {
+      setOpenSearch(true);
+    }
+  }, [location.pathname, location.search]);
+
   const closeMobileMenu = () => {
     setOpenMenu(false);
   };
 
-  const handleCustomChibiClick = () => {
+  const navigateToSearch = (query, options = {}) => {
+    const trimmedQuery = query.trim();
+    const target = trimmedQuery ? `/shop?search=${encodeURIComponent(trimmedQuery)}` : "/shop";
+
+    navigate(target, { replace: options.replace ?? false });
+  };
+
+  const submitSearch = (event) => {
+    event.preventDefault();
+
+    const query = searchQuery.trim();
+
+    if (!query) {
+      setOpenSearch(true);
+      searchInputRef.current?.focus();
+      return;
+    }
+
+    navigateToSearch(query);
     closeMobileMenu();
-    navigate("/");
-    window.requestAnimationFrame(() => {
-      document.getElementById("custom-chibi")?.scrollIntoView({
-        behavior: "smooth",
-      });
-    });
+  };
+
+  const handleSearchButtonClick = () => {
+    if (!openSearch) {
+      setOpenSearch(true);
+      return;
+    }
+
+    const query = searchQuery.trim();
+
+    if (!query) {
+      searchInputRef.current?.focus();
+      return;
+    }
+
+    navigateToSearch(query);
+    closeMobileMenu();
+  };
+
+  const handleSearchChange = (event) => {
+    const nextQuery = event.target.value;
+    setSearchQuery(nextQuery);
+    navigateToSearch(nextQuery, { replace: location.pathname === "/shop" });
   };
 
   const handleLogout = async () => {
@@ -81,7 +137,7 @@ function Header({ profile, user }) {
 
   return (
     <>
-      <header className="site-header">
+      <header className={`site-header ${openSearch ? "search-open" : ""}`}>
         <img className="logo" src={LOGO} alt="Puchi Puchi Logo" />
 
         <button
@@ -102,13 +158,9 @@ function Header({ profile, user }) {
             <NavLink to="/shop" className="nav-link" onClick={closeMobileMenu}>
               Shop
             </NavLink>
-            <button
-              className="nav-link nav-button"
-              type="button"
-              onClick={handleCustomChibiClick}
-            >
-              Custom Gifts
-            </button>
+            <NavLink to="/gallery" className="nav-link" onClick={closeMobileMenu}>
+              Gallery
+            </NavLink>
             <NavLink to="/about" className="nav-link" onClick={closeMobileMenu}>
               About
             </NavLink>
@@ -118,9 +170,31 @@ function Header({ profile, user }) {
           </nav>
 
           <div className="header-account">
-            <button className="header-icon-btn" type="button" aria-label="Search">
-              <LuSearch />
-            </button>
+            <form className={`header-search ${openSearch ? "open" : ""}`} onSubmit={submitSearch}>
+              {openSearch && (
+                <input
+                  ref={searchInputRef}
+                  type="search"
+                  value={searchQuery}
+                  onChange={handleSearchChange}
+                  placeholder="Search products"
+                  aria-label="Search products"
+                  onKeyDown={(event) => {
+                    if (event.key === "Escape") {
+                      setOpenSearch(false);
+                    }
+                  }}
+                />
+              )}
+              <button
+                className="header-icon-btn"
+                type="button"
+                aria-label={openSearch ? "Submit search" : "Search"}
+                onClick={handleSearchButtonClick}
+              >
+                <LuSearch />
+              </button>
+            </form>
 
             {user ? (
               <>

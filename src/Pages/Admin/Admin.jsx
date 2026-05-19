@@ -12,6 +12,7 @@ import {
   LuPlus,
   LuSearch,
   LuShoppingBag,
+  LuStar,
   LuTrash2,
   LuUserRound,
   LuUsers,
@@ -44,6 +45,7 @@ const adminNav = [
   { to: "/admin", label: "Overview", icon: LuLayoutDashboard, end: true },
   { to: "/admin/orders", label: "Orders", icon: LuPackage },
   { to: "/admin/users", label: "Users", icon: LuUserRound },
+  { to: "/admin/reviews", label: "Reviews", icon: LuStar },
   { to: "/admin/products", label: "Products", icon: LuShoppingBag },
 ];
 
@@ -93,6 +95,16 @@ const createBlankProductForm = () => ({
   is_best_seller: false,
   is_new_arrival: false,
   variants: [createBlankVariant()],
+});
+
+const createBlankAdminReviewForm = () => ({
+  reviewer_first_name: "",
+  place: "",
+  product_name: "",
+  rating: "5",
+  review_text: "",
+  review_date: new Date().toISOString().slice(0, 10),
+  is_approved: true,
 });
 
 const centsToRupees = (value) => {
@@ -749,6 +761,281 @@ function UsersPage() {
         </table>
       </div>
       )}
+    </>
+  );
+}
+
+function AdminReviewsPage() {
+  const [reviews, setReviews] = useState([]);
+  const [form, setForm] = useState(createBlankAdminReviewForm);
+  const [query, setQuery] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [message, setMessage] = useState("");
+
+  const fetchReviews = useCallback(async () => {
+    setLoading(true);
+    setError("");
+
+    try {
+      const { data, error } = await withRequestTimeout(supabase
+        .from("reviews")
+        .select("*")
+        .order("review_date", { ascending: false })
+        .order("created_at", { ascending: false }));
+
+      if (error) throw error;
+
+      setReviews(data || []);
+    } catch (error) {
+      console.error("Admin reviews error:", error);
+      setError(
+        isTimeoutError(error)
+          ? "Reviews are taking too long to load. Please refresh in a moment."
+          : "We could not load reviews right now."
+      );
+      setReviews([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchReviews();
+  }, [fetchReviews]);
+
+  const filteredReviews = useMemo(() => {
+    const searchTerm = query.trim().toLowerCase();
+
+    if (!searchTerm) return reviews;
+
+    return reviews.filter((review) => (
+      [
+        review.reviewer_first_name,
+        review.place,
+        review.product_name,
+        review.review_text,
+      ].filter(Boolean).join(" ").toLowerCase().includes(searchTerm)
+    ));
+  }, [query, reviews]);
+
+  const handleFormChange = (field, value) => {
+    setError("");
+    setMessage("");
+    setForm((current) => ({
+      ...current,
+      [field]: value,
+    }));
+  };
+
+  const saveReview = async (event) => {
+    event.preventDefault();
+    setSaving(true);
+    setError("");
+    setMessage("");
+
+    const payload = {
+      reviewer_first_name: form.reviewer_first_name.trim(),
+      place: form.place.trim(),
+      product_name: form.product_name.trim(),
+      rating: Number(form.rating),
+      review_text: form.review_text.trim(),
+      review_date: form.review_date,
+      is_approved: form.is_approved,
+      source: "legacy",
+    };
+
+    if (!payload.reviewer_first_name || !payload.place || !payload.product_name || !payload.review_text) {
+      setError("Please fill every review field.");
+      setSaving(false);
+      return;
+    }
+
+    const { error } = await supabase
+      .from("reviews")
+      .insert(payload);
+
+    if (error) {
+      setError(error.message);
+      setSaving(false);
+      return;
+    }
+
+    setForm(createBlankAdminReviewForm());
+    setMessage("Review saved.");
+    setSaving(false);
+    await fetchReviews();
+  };
+
+  const updateReviewApproval = async (review, isApproved) => {
+    setError("");
+    setMessage("");
+
+    const { error } = await supabase
+      .from("reviews")
+      .update({ is_approved: isApproved })
+      .eq("id", review.id);
+
+    if (error) {
+      setError(error.message);
+      return;
+    }
+
+    setReviews((current) => current.map((item) => (
+      item.id === review.id ? { ...item, is_approved: isApproved } : item
+    )));
+  };
+
+  const deleteReview = async (review) => {
+    const shouldDelete = window.confirm(`Delete review from ${review.reviewer_first_name}?`);
+
+    if (!shouldDelete) return;
+
+    setError("");
+    setMessage("");
+
+    const { error } = await supabase
+      .from("reviews")
+      .delete()
+      .eq("id", review.id);
+
+    if (error) {
+      setError(error.message);
+      return;
+    }
+
+    setReviews((current) => current.filter((item) => item.id !== review.id));
+  };
+
+  return (
+    <>
+      <PageHeader
+        title="Reviews"
+        description="Approve customer submissions and add older reviews from before the website."
+        action={<SearchField placeholder="Search reviews..." value={query} onChange={setQuery} />}
+      />
+
+      <div className="admin-reviews-layout">
+        <form className="admin-review-form admin-panel" onSubmit={saveReview}>
+          <h2>Add Past Review</h2>
+          <div className="admin-form-grid">
+            <label>
+              First name
+              <input
+                type="text"
+                value={form.reviewer_first_name}
+                onChange={(event) => handleFormChange("reviewer_first_name", event.target.value.slice(0, 40))}
+                maxLength={40}
+                required
+              />
+            </label>
+            <label>
+              Place
+              <input
+                type="text"
+                value={form.place}
+                onChange={(event) => handleFormChange("place", event.target.value.slice(0, 80))}
+                maxLength={80}
+                required
+              />
+            </label>
+            <label className="admin-form-wide">
+              Product name
+              <input
+                type="text"
+                value={form.product_name}
+                onChange={(event) => handleFormChange("product_name", event.target.value.slice(0, 120))}
+                maxLength={120}
+                required
+              />
+            </label>
+            <label>
+              Rating
+              <select
+                value={form.rating}
+                onChange={(event) => handleFormChange("rating", event.target.value)}
+              >
+                <option value="5">5 stars</option>
+                <option value="4">4 stars</option>
+                <option value="3">3 stars</option>
+                <option value="2">2 stars</option>
+                <option value="1">1 star</option>
+              </select>
+            </label>
+            <label>
+              Review date
+              <input
+                type="date"
+                value={form.review_date}
+                onChange={(event) => handleFormChange("review_date", event.target.value)}
+                required
+              />
+            </label>
+            <label className="admin-form-wide">
+              Review
+              <textarea
+                value={form.review_text}
+                onChange={(event) => handleFormChange("review_text", event.target.value.slice(0, 1000))}
+                rows={5}
+                maxLength={1000}
+                required
+              />
+            </label>
+            <label className="admin-check admin-form-wide">
+              <input
+                type="checkbox"
+                checked={form.is_approved}
+                onChange={(event) => handleFormChange("is_approved", event.target.checked)}
+              />
+              <span>Show on reviews page immediately</span>
+            </label>
+          </div>
+          {message && <p className="admin-form-success">{message}</p>}
+          {error && <p className="admin-form-error text-error">{error}</p>}
+          <button className="admin-add-product" type="submit" disabled={saving}>
+            {saving ? "Saving..." : "Save Review"}
+          </button>
+        </form>
+
+        <section className="admin-panel admin-review-list-panel">
+          <h2>All Reviews</h2>
+          {loading && <p className="admin-status-message">Loading reviews...</p>}
+          {!loading && filteredReviews.length === 0 && (
+            <p className="admin-empty-panel">No reviews found.</p>
+          )}
+          {!loading && filteredReviews.length > 0 && (
+            <div className="admin-review-list">
+              {filteredReviews.map((review) => (
+                <article className="admin-review-card" key={review.id}>
+                  <header>
+                    <div>
+                      <strong>{review.reviewer_first_name}</strong>
+                      <span>{review.place} - {review.product_name}</span>
+                    </div>
+                    <em>{review.rating}/5</em>
+                  </header>
+                  <p>{review.review_text}</p>
+                  <footer>
+                    <span>{formatOrderDate(review.review_date)} - {review.is_approved ? "Approved" : "Pending"}</span>
+                    <div>
+                      <button
+                        type="button"
+                        onClick={() => updateReviewApproval(review, !review.is_approved)}
+                      >
+                        {review.is_approved ? "Hide" : "Approve"}
+                      </button>
+                      <button type="button" onClick={() => deleteReview(review)}>
+                        Delete
+                      </button>
+                    </div>
+                  </footer>
+                </article>
+              ))}
+            </div>
+          )}
+        </section>
+      </div>
     </>
   );
 }
@@ -1519,6 +1806,7 @@ function Admin() {
           <Route index element={<OverviewPage />} />
           <Route path="orders" element={<OrdersPage />} />
           <Route path="users" element={<UsersPage />} />
+          <Route path="reviews" element={<AdminReviewsPage />} />
           <Route path="products" element={<ProductsPage />} />
         </Routes>
       </section>
