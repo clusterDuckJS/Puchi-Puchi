@@ -19,6 +19,7 @@ import {
   LuX,
 } from "react-icons/lu";
 import { NavLink, Route, Routes, useNavigate } from "react-router-dom";
+import { formatOrderStatus, formatShortDate, getCountdownLabel, ORDER_STAGE_OPTIONS } from "../../utils/orders";
 import { supabase } from "../../utils/supabase";
 import { isTimeoutError, withRequestTimeout } from "../../utils/request";
 import "./admin.css";
@@ -28,15 +29,6 @@ const currency = new Intl.NumberFormat("en-IN", {
   currency: "INR",
   maximumFractionDigits: 0,
 });
-
-const ORDER_STAGE_OPTIONS = [
-  { value: "paid", label: "Paid" },
-  { value: "magic_modelling", label: "Magic Modelling" },
-  { value: "curing_chamber", label: "Curing Chamber" },
-  { value: "final_touches", label: "Final Touches" },
-  { value: "ready_to_ship", label: "Ready to Ship" },
-  { value: "delivered", label: "Delivered" },
-];
 
 const USER_DISPLAY_ID_START = 1;
 const ORDER_DISPLAY_ID_START = 177;
@@ -136,24 +128,6 @@ const withSequentialDisplayIds = (items, startAt) => {
   }));
 };
 
-const formatOrderDate = (value) => {
-  if (!value) return "";
-
-  return new Intl.DateTimeFormat("en-IN", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  }).format(new Date(value));
-};
-
-const formatOrderStatus = (status) => {
-  const option = ORDER_STAGE_OPTIONS.find((item) => item.value === status);
-
-  if (option) return option.label;
-
-  return normalizeListValue(String(status || "confirmed").replace(/_/g, " "));
-};
-
 function PageHeader({ title, description, action }) {
   return (
     <header className="admin-page-header">
@@ -180,6 +154,10 @@ function SearchField({ placeholder, value, onChange }) {
   );
 }
 
+const getAdminOrderStatusValue = (status) => (
+  status === "ready_to_ship" || status === "shipped" ? "dispatched" : status || "paid"
+);
+
 function OverviewPage() {
   const [metrics, setMetrics] = useState([]);
   const [topProducts, setTopProducts] = useState([]);
@@ -205,6 +183,9 @@ function OverviewPage() {
             user_id,
             total_amount,
             status,
+            paid_at,
+            tracking_id,
+            dispatched_at,
             created_at,
             order_items (
               quantity,
@@ -385,6 +366,7 @@ function OrdersPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [savingStatusId, setSavingStatusId] = useState("");
+  const [savingTrackingId, setSavingTrackingId] = useState("");
 
   const fetchOrders = useCallback(async () => {
     setLoading(true);
@@ -398,6 +380,9 @@ function OrdersPage() {
           user_id,
           total_amount,
           status,
+          paid_at,
+          tracking_id,
+          dispatched_at,
           created_at,
           order_items (
             id,
@@ -475,21 +460,55 @@ function OrdersPage() {
     setError("");
 
     try {
+      const currentOrder = orderRows.find((order) => order.id === orderId);
+      const payload = { status };
+
+      if (status === "dispatched" && !currentOrder?.dispatched_at) {
+        payload.dispatched_at = new Date().toISOString();
+      }
+
       const { error: updateError } = await supabase
         .from("orders")
-        .update({ status })
+        .update(payload)
         .eq("id", orderId);
 
       if (updateError) throw updateError;
 
       setOrderRows((current) => current.map((order) => (
-        order.id === orderId ? { ...order, status } : order
+        order.id === orderId ? { ...order, ...payload } : order
       )));
     } catch (error) {
       console.error("Order status update error:", error);
       setError("We could not update that order stage.");
     } finally {
       setSavingStatusId("");
+    }
+  };
+
+  const updateOrderTracking = async (orderId, trackingId) => {
+    setSavingTrackingId(orderId);
+    setError("");
+
+    try {
+      const payload = {
+        tracking_id: trackingId.trim() || null,
+      };
+
+      const { error: updateError } = await supabase
+        .from("orders")
+        .update(payload)
+        .eq("id", orderId);
+
+      if (updateError) throw updateError;
+
+      setOrderRows((current) => current.map((order) => (
+        order.id === orderId ? { ...order, ...payload } : order
+      )));
+    } catch (error) {
+      console.error("Order tracking update error:", error);
+      setError("We could not update that tracking ID.");
+    } finally {
+      setSavingTrackingId("");
     }
   };
 
@@ -526,6 +545,7 @@ function OrdersPage() {
         customer.name,
         customer.email,
         order.status,
+        order.tracking_id,
         itemsText,
       ].filter(Boolean).join(" ").toLowerCase().includes(searchTerm);
     });
@@ -555,8 +575,10 @@ function OrdersPage() {
               <th>Items</th>
               <th>Total</th>
               <th>Date</th>
+              <th>Timeline</th>
               <th>Status</th>
               <th>Update Stage</th>
+              <th>Tracking</th>
             </tr>
           </thead>
           <tbody>
@@ -605,7 +627,12 @@ function OrdersPage() {
                     </div>
                   </td>
                   <td>{currency.format((order.total_amount || 0) / 100)}</td>
-                  <td>{formatOrderDate(order.created_at)}</td>
+                  <td>{formatShortDate(order.paid_at || order.created_at)}</td>
+                  <td>
+                    <span className="admin-order-countdown">
+                      {getCountdownLabel(order)}
+                    </span>
+                  </td>
                   <td>
                     <span className={`admin-status ${order.status !== "delivered" ? "accent" : ""}`}>
                       {formatOrderStatus(order.status)}
@@ -613,7 +640,7 @@ function OrdersPage() {
                   </td>
                   <td>
                     <select
-                      value={order.status || "paid"}
+                      value={getAdminOrderStatusValue(order.status)}
                       onChange={(event) => updateOrderStatus(order.id, event.target.value)}
                       aria-label={`${order.id} stage`}
                       disabled={savingStatusId === order.id}
@@ -622,6 +649,26 @@ function OrdersPage() {
                         <option value={stage.value} key={stage.value}>{stage.label}</option>
                       ))}
                     </select>
+                  </td>
+                  <td>
+                    <form
+                      className="admin-tracking-form"
+                      onSubmit={(event) => {
+                        event.preventDefault();
+                        updateOrderTracking(order.id, event.currentTarget.elements.trackingId.value);
+                      }}
+                    >
+                      <input
+                        name="trackingId"
+                        type="text"
+                        defaultValue={order.tracking_id || ""}
+                        placeholder="Tracking ID"
+                        aria-label={`${order.id} tracking ID`}
+                      />
+                      <button type="submit" disabled={savingTrackingId === order.id}>
+                        Save
+                      </button>
+                    </form>
                   </td>
                 </tr>
               );
@@ -752,7 +799,7 @@ function UsersPage() {
                 <td>{user.display_id}</td>
                 <td>{user.name}</td>
                 <td>{user.email || "No email saved"}</td>
-                <td>{formatOrderDate(user.created_at) || "Unknown"}</td>
+                <td>{formatShortDate(user.created_at) || "Unknown"}</td>
                 <td>{user.orderCount}</td>
                 <td>{currency.format(user.totalSpent / 100)}</td>
               </tr>
@@ -1017,7 +1064,7 @@ function AdminReviewsPage() {
                   </header>
                   <p>{review.review_text}</p>
                   <footer>
-                    <span>{formatOrderDate(review.review_date)} - {review.is_approved ? "Approved" : "Pending"}</span>
+                    <span>{formatShortDate(review.review_date)} - {review.is_approved ? "Approved" : "Pending"}</span>
                     <div>
                       <button
                         type="button"

@@ -19,37 +19,27 @@ import {
 } from "react-icons/lu";
 import { NavLink, useNavigate } from "react-router-dom";
 import { formatCartPrice, parseCartListField } from "../../utils/cart";
+import {
+  formatOrderStatus,
+  formatShortDate,
+  getCountdownLabel,
+  getOrderStageIndex,
+  ORDER_STAGE_OPTIONS,
+} from "../../utils/orders";
 import { isTimeoutError, withRequestTimeout } from "../../utils/request";
 import { supabase } from "../../utils/supabase";
 import "./profile.css";
 
 const ORDER_STEPS = [
-  { key: "paid", label: "Order Locked In", icon: LuCircleCheck },
-  { key: "modeling", label: "Magic Modelling", icon: LuWandSparkles },
-  { key: "printing", label: "Printing", icon: LuPrinter },
-  { key: "curing", label: "Curing", icon: LuSparkles },
-  { key: "painting", label: "Paint Studio", icon: LuPalette },
-  { key: "finishing", label: "Final Touches", icon: LuPackageCheck },
-  { key: "ready", label: "Ready to Ship", icon: LuTruck },
+  { ...ORDER_STAGE_OPTIONS[0], icon: LuCircleCheck },
+  { ...ORDER_STAGE_OPTIONS[1], icon: LuWandSparkles },
+  { ...ORDER_STAGE_OPTIONS[2], icon: LuPrinter },
+  { ...ORDER_STAGE_OPTIONS[3], icon: LuSparkles },
+  { ...ORDER_STAGE_OPTIONS[4], icon: LuPalette },
+  { ...ORDER_STAGE_OPTIONS[5], icon: LuPackageCheck },
+  { ...ORDER_STAGE_OPTIONS[6], icon: LuTruck },
+  { ...ORDER_STAGE_OPTIONS[7], icon: LuCircleCheck },
 ];
-
-const STAGE_BY_STATUS = {
-  paid: 0,
-  confirmed: 0,
-  "order locked in": 0,
-  modeling: 1,
-  "magic modelling": 1,
-  printing: 2,
-  curing: 3,
-  painting: 4,
-  "paint studio": 4,
-  finishing: 5,
-  "final touches": 5,
-  ready: 6,
-  "ready to ship": 6,
-  shipped: 6,
-  delivered: 6,
-};
 
 const PROFILE_TABS = [
   { key: "orders", label: "My Orders", icon: LuBox },
@@ -73,31 +63,13 @@ const createBlankAddressForm = () => ({
   is_default: false,
 });
 
-const formatOrderDate = (value) => {
-  if (!value) return "Recently";
-
-  return new Intl.DateTimeFormat("en-IN", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  }).format(new Date(value));
-};
-
-const getItemStageIndex = (item, order) => {
-  const status = String(
-    item.production_stage || item.stage || item.status || order.status || "paid",
-  ).toLowerCase();
-
-  return STAGE_BY_STATUS[status] ?? 0;
-};
-
-function ItemProgress({ item, order }) {
-  const stageIndex = getItemStageIndex(item, order);
-  const status = String(item.status || order.status || "paid").toLowerCase();
+function OrderProgress({ order }) {
+  const stageIndex = getOrderStageIndex(order.status);
+  const status = String(order.status || "paid").toLowerCase();
   const isDelivered = status === "delivered";
 
   return (
-    <div className="profile-item-progress" aria-label="Item production progress">
+    <div className="profile-order-progress" aria-label="Order production progress">
       <div className="profile-progress-line" />
       {ORDER_STEPS.map((step, index) => {
         const Icon = step.icon;
@@ -113,8 +85,24 @@ function ItemProgress({ item, order }) {
         );
       })}
       <p className={isDelivered ? "profile-delivered" : "profile-current-stage"}>
-        {isDelivered ? "Delivered successfully" : ORDER_STEPS[stageIndex].label}
+        {isDelivered ? "Delivered successfully" : formatOrderStatus(order.status)}
       </p>
+    </div>
+  );
+}
+
+function OrderTimelineMeta({ order }) {
+  return (
+    <div className="profile-order-timeline-meta">
+      <span>{getCountdownLabel(order)}</span>
+      {order.tracking_id && (
+        <span>
+          Tracking ID: <strong>{order.tracking_id}</strong>
+        </span>
+      )}
+      {order.dispatched_at && (
+        <span>Dispatched {formatShortDate(order.dispatched_at)}</span>
+      )}
     </div>
   );
 }
@@ -146,10 +134,15 @@ function OrdersTab({ orders, loading, error }) {
           <header className="profile-order-header">
             <div>
               <strong>#{order.id.slice(0, 8).toUpperCase()}</strong>
-              <span>{formatOrderDate(order.created_at)}</span>
+              <span>{formatShortDate(order.paid_at || order.created_at) || "Recently"}</span>
             </div>
-            <em>{order.status || "confirmed"}</em>
+            <em>{formatOrderStatus(order.status)}</em>
           </header>
+
+          <section className="profile-order-tracker">
+            <OrderProgress order={order} />
+            <OrderTimelineMeta order={order} />
+          </section>
 
           <div className="profile-order-items">
             {(order.order_items || []).map((item) => {
@@ -161,8 +154,6 @@ function OrdersTab({ orders, loading, error }) {
 
               return (
                 <section className="profile-order-item" key={item.id}>
-                  <ItemProgress item={item} order={order} />
-
                   <div className="profile-order-item-row">
                     <img src={image} alt={product.name || "Puchi Puchi order item"} />
                     <div>
@@ -452,6 +443,9 @@ function Profile({ user, profile, onProfileUpdated }) {
           id,
           total_amount,
           status,
+          paid_at,
+          tracking_id,
+          dispatched_at,
           created_at,
           order_items (
             *,
@@ -496,6 +490,28 @@ function Profile({ user, profile, onProfileUpdated }) {
   useEffect(() => {
     loadOrders();
   }, [loadOrders]);
+
+  useEffect(() => {
+    const channel = supabase
+      .channel(`profile-orders-${user.id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "orders",
+          filter: `user_id=eq.${user.id}`,
+        },
+        () => {
+          loadOrders();
+        },
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [loadOrders, user.id]);
 
   const loadAddresses = useCallback(async () => {
     setAddressesLoading(true);

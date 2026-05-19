@@ -205,6 +205,14 @@
   display: grid;
 }
 
+.profile-order-tracker {
+  display: grid;
+  gap: 0.9rem;
+  padding: 1.2rem 1.5rem 1.35rem;
+  border-bottom: 1px solid #f1dbe2;
+  background: linear-gradient(180deg, #fff8fb 0%, #fffcfb 100%);
+}
+
 .profile-order-item {
   padding: 1.35rem 1.5rem 1.55rem;
   border-bottom: 1px solid #f5e4e9;
@@ -214,12 +222,11 @@
   border-bottom: 0;
 }
 
-.profile-item-progress {
+.profile-order-progress {
   position: relative;
   display: grid;
-  grid-template-columns: repeat(7, minmax(4.5rem, 1fr));
-  gap: 0.4rem;
-  margin-bottom: 1.5rem;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  gap: 0.45rem;
   padding: 0.45rem 0 1.95rem;
 }
 
@@ -283,6 +290,31 @@
 
 .profile-delivered {
   color: #19a15f;
+}
+
+.profile-order-timeline-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+  align-items: center;
+}
+
+.profile-order-timeline-meta span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2rem;
+  padding: 0.35rem 0.7rem;
+  border: 1px solid #f2cad7;
+  border-radius: 999px;
+  background: #fff;
+  color: #7c5361;
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.profile-order-timeline-meta strong {
+  margin-left: 0.25rem;
+  color: #321528;
 }
 
 .profile-order-item-row {
@@ -671,22 +703,40 @@
     gap: 0.35rem;
   }
 
-  .profile-item-progress {
-    grid-template-columns: repeat(7, 4.75rem);
-    overflow-x: auto;
-    padding-bottom: 2.1rem;
+  .profile-order-tracker {
+    padding-right: 1rem;
+    padding-left: 1rem;
+  }
+
+  .profile-order-progress {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    row-gap: 1.35rem;
+    padding-bottom: 2.25rem;
   }
 
   .profile-progress-line {
-    left: 2.2rem;
-    width: 30rem;
-    right: auto;
+    display: none;
+  }
+
+  .profile-progress-step {
+    min-width: 0;
+  }
+
+  .profile-progress-step span {
+    width: 2.15rem;
+  }
+
+  .profile-progress-step small {
+    font-size: 0.62rem;
+    overflow-wrap: anywhere;
   }
 
   .profile-current-stage,
   .profile-delivered {
+    right: 0;
     left: 0;
     transform: none;
+    white-space: normal;
   }
 
   .profile-order-item-row {

@@ -370,7 +370,7 @@
 .admin-table-card table {
   width: 100%;
   border-collapse: collapse;
-  min-width: 860px;
+  min-width: 1120px;
 }
 
 .admin-table-card th,
@@ -431,6 +431,42 @@
   border-radius: 999px;
   background: #fff5f8;
   color: #5a3f45;
+}
+
+.admin-order-countdown {
+  display: inline-flex;
+  max-width: 14rem;
+  color: #7a5360;
+  font-size: 0.82rem;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+.admin-tracking-form {
+  display: grid;
+  grid-template-columns: minmax(8rem, 1fr) auto;
+  gap: 0.45rem;
+  min-width: 15rem;
+}
+
+.admin-tracking-form input {
+  width: 100%;
+  min-height: 40px;
+  padding: 0.45rem 0.75rem;
+  border: 1px solid rgb(221 95 137 / 15%);
+  border-radius: 999px;
+  background: #fff5f8;
+  color: #5a3f45;
+}
+
+.admin-tracking-form button {
+  min-height: 40px;
+  padding: 0.45rem 0.8rem;
+  border: 1px solid rgb(221 95 137 / 22%);
+  background: #fffdf9;
+  color: var(--color-primary);
+  font-size: 0.82rem;
+  font-weight: 800;
 }
 
 .admin-order-items {

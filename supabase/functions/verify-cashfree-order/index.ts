@@ -68,7 +68,7 @@ serve(async (request) => {
     const serviceClient = createClient(supabaseUrl, supabaseServiceRoleKey)
     await serviceClient
       .from("orders")
-      .update({ status: "paid" })
+      .update({ status: "paid", paid_at: new Date().toISOString() })
       .eq("id", supabaseOrderId)
   }
 
