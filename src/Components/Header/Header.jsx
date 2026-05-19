@@ -107,7 +107,7 @@ function Header({ profile, user }) {
               type="button"
               onClick={handleCustomChibiClick}
             >
-              Custom Chibi
+              Custom Gifts
             </button>
             <NavLink to="/about" className="nav-link" onClick={closeMobileMenu}>
               About
@@ -137,8 +137,8 @@ function Header({ profile, user }) {
                   }}
                   disabled={isLoggingOut}
                 >
-                  <LuLogOut />
-                  <span>{isLoggingOut ? "Logging out" : "Log out"}</span>
+                  <LuLogOut size={18}/>
+                  {/* <span>{isLoggingOut ? "Logging out" : "Log out"}</span> */}
                 </button>
               </>
             ) : (

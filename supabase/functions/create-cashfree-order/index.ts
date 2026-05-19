@@ -14,6 +14,7 @@ const SHIPPING_OPTIONS = {
 
 const INSURANCE_AMOUNT = 10000
 const PRIORITY_CRAFTING_MULTIPLIER = 0.5
+const FREE_STANDARD_SHIPPING_THRESHOLD = 100000
 
 const jsonResponse = (body: Record<string, unknown>, status = 200) =>
   new Response(JSON.stringify(body), {
@@ -93,12 +94,17 @@ serve(async (request) => {
   const user = userData.user
   const body = await request.json().catch(() => ({}))
   const orderId = typeof body.orderId === "string" ? body.orderId : ""
+  const addressId = typeof body.addressId === "string" ? body.addressId : ""
   const shippingMethod = body.shippingMethod === "priority" ? "priority" : "standard"
   const hasInsurance = body.hasInsurance === true
   const craftingSpeed = body.craftingSpeed === "priority" ? "priority" : "standard"
 
   if (!orderId) {
     return jsonResponse({ error: "Cart order is missing." }, 400)
+  }
+
+  if (!addressId) {
+    return jsonResponse({ error: "Please select a delivery address before checkout." }, 400)
   }
 
   const { data: order, error: orderError } = await serviceClient
@@ -131,7 +137,21 @@ serve(async (request) => {
     return jsonResponse({ error: "Your cart is empty." }, 400)
   }
 
-  const shipping = SHIPPING_OPTIONS[shippingMethod]
+  const { data: address, error: addressError } = await serviceClient
+    .from("user_addresses")
+    .select("id, full_name, phone, address_line1, address_line2, city, state, pincode, country")
+    .eq("id", addressId)
+    .eq("user_id", user.id)
+    .single()
+
+  if (addressError || !address) {
+    return jsonResponse({ error: "Please select a valid delivery address." }, 400)
+  }
+
+  const shipping =
+    shippingMethod === "standard" && subtotal >= FREE_STANDARD_SHIPPING_THRESHOLD
+      ? 0
+      : SHIPPING_OPTIONS[shippingMethod]
   const insurance = hasInsurance ? INSURANCE_AMOUNT : 0
   const craftingSpeedFee =
     craftingSpeed === "priority" ? Math.round(subtotal * PRIORITY_CRAFTING_MULTIPLIER) : 0
@@ -148,7 +168,8 @@ serve(async (request) => {
   }
 
   const customerPhone = normalizePhone(
-    profile.phone ||
+    address.phone ||
+      profile.phone ||
       (typeof user.user_metadata?.phone === "string" ? user.user_metadata.phone : null) ||
       user.phone,
   )
@@ -157,7 +178,8 @@ serve(async (request) => {
     return jsonResponse({ error: "Please add a valid phone number in your profile." }, 400)
   }
 
-  const customerName = [profile.first_name, profile.last_name].filter(Boolean).join(" ")
+  const profileName = [profile.first_name, profile.last_name].filter(Boolean).join(" ")
+  const customerName = address.full_name || profileName
   const cashfreeOrderId = `puchi_${order.id.replaceAll("-", "")}_${Date.now()}`
   const cashfreePayload = {
     order_id: cashfreeOrderId,
@@ -178,6 +200,8 @@ serve(async (request) => {
       shipping_method: shippingMethod,
       insurance: hasInsurance ? "yes" : "no",
       crafting_speed: craftingSpeed,
+      address_id: address.id,
+      delivery_pincode: address.pincode,
     },
   }
 

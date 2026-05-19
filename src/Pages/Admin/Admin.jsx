@@ -75,7 +75,7 @@ const PRODUCT_CATEGORY_OPTIONS = [
   "Gaming",
   "TV Show",
   "Movie",
-  "Pet",
+  "Pets",
   "Made Just for You",
 ];
 
@@ -795,6 +795,7 @@ function ProductsPage() {
         .slice(0, 5);
 
       return {
+        id: variant.id,
         name: variant.name.trim() || null,
         price: rupeesToCents(variant.price),
         discount_price: variant.discount_price === "" ? null : rupeesToCents(variant.discount_price),
@@ -851,35 +852,88 @@ function ProductsPage() {
     }
 
     if (editingProduct) {
-      const { error: deleteError } = await supabase
-        .from("product_variants")
-        .delete()
-        .eq("product_id", savedProduct.id);
+      const originalVariantIds = (editingProduct.product_variants || [])
+        .map((variant) => variant.id)
+        .filter(Boolean);
+      const savedVariantIds = variants
+        .map((variant) => variant.id)
+        .filter(Boolean);
+      const removedVariantIds = originalVariantIds.filter((id) => !savedVariantIds.includes(id));
 
-      if (deleteError) {
-        setFormError(deleteError.message);
-        setSaving(false);
-        return;
+      if (removedVariantIds.length > 0) {
+        const { error: removeError } = await supabase
+          .from("product_variants")
+          .update({ is_active: false })
+          .in("id", removedVariantIds);
+
+        if (removeError) {
+          setFormError(removeError.message);
+          setSaving(false);
+          return;
+        }
       }
     }
 
-    const { error: variantError } = await supabase
-      .from("product_variants")
-      .insert(variants.map((variant) => ({
-        ...variant,
-        product_id: savedProduct.id,
-      })));
+    for (const variant of variants) {
+      const { id, ...variantPayload } = variant;
+      const variantRequest = id
+        ? supabase
+          .from("product_variants")
+          .update(variantPayload)
+          .eq("id", id)
+          .eq("product_id", savedProduct.id)
+        : supabase
+          .from("product_variants")
+          .insert({
+            ...variantPayload,
+            product_id: savedProduct.id,
+          });
 
-    if (variantError) {
-      setFormError(variantError.message);
-      setSaving(false);
-      return;
+      const { error: variantError } = await variantRequest;
+
+      if (variantError) {
+        setFormError(variantError.message);
+        setSaving(false);
+        return;
+      }
     }
 
     await fetchProducts();
     setSaving(false);
     setModalMode(null);
     setEditingProduct(null);
+  };
+
+  const deleteProduct = async (product) => {
+    const shouldDelete = window.confirm(
+      `Delete ${product.name}? It will be hidden from the shop without removing order history.`
+    );
+
+    if (!shouldDelete) return;
+
+    setError("");
+
+    const { error: productError } = await supabase
+      .from("products")
+      .update({ is_active: false })
+      .eq("id", product.id);
+
+    if (productError) {
+      setError(productError.message);
+      return;
+    }
+
+    const { error: variantsError } = await supabase
+      .from("product_variants")
+      .update({ is_active: false })
+      .eq("product_id", product.id);
+
+    if (variantsError) {
+      setError(variantsError.message);
+      return;
+    }
+
+    await fetchProducts();
   };
 
   return (
@@ -924,6 +978,10 @@ function ProductsPage() {
                   <button type="button" onClick={() => openEditModal(product)}>
                     <LuPenLine />
                     <span>Edit</span>
+                  </button>
+                  <button type="button" onClick={() => deleteProduct(product)}>
+                    <LuTrash2 />
+                    <span>Delete</span>
                   </button>
                 </div>
               </article>
