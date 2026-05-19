@@ -4,10 +4,11 @@ import { NavLink, useNavigate, useParams } from 'react-router-dom'
 import { LuArrowLeft, LuHeart, LuImagePlus, LuMinus, LuPlus, LuSearch, LuShoppingBag, LuX } from 'react-icons/lu'
 import { supabase } from '../../utils/supabase'
 import ProductCard from '../../Components/ProductCard/ProductCard'
-import { addItemToCart, getCurrentUserId, uploadCustomOrderImage } from '../../utils/cart'
+import { addItemToCart, CUSTOM_BASE_FEE, formatCartPrice, getCurrentUserId, uploadCustomOrderImage } from '../../utils/cart'
 import { isTimeoutError, withRequestTimeout } from '../../utils/request'
 
 const CUSTOM_IMAGE_MAX_BYTES = 15 * 1024 * 1024
+const CUSTOM_BASE_TEXT_MAX_LENGTH = 40
 
 const parseListField = (value) => {
   if (Array.isArray(value)) return value.map(String).filter(Boolean)
@@ -32,6 +33,8 @@ function ProductDetails() {
   const [cartError, setCartError] = useState("")
   const [customImageFile, setCustomImageFile] = useState(null)
   const [customImagePreview, setCustomImagePreview] = useState("")
+  const [hasCustomBase, setHasCustomBase] = useState(false)
+  const [customBaseText, setCustomBaseText] = useState("")
 
   useEffect(() => {
     let isCurrent = true
@@ -107,6 +110,8 @@ function ProductDetails() {
     setQuantity(1)
     setCustomImageFile(null)
     setCustomImagePreview("")
+    setHasCustomBase(false)
+    setCustomBaseText("")
   }, [product])
 
   useEffect(() => {
@@ -182,7 +187,9 @@ function ProductDetails() {
     : variants
   const variant = variants.find((item) => item.id === selectedVariantId) || variants[0] || product.product_variants?.[0]
   const price = variant?.discount_price || variant?.price || 0
-  const formattedPrice = `\u20b9${(price / 100).toLocaleString("en-IN")}`
+  const customBaseFee = hasCustomBase ? CUSTOM_BASE_FEE : 0
+  const displayPrice = price + customBaseFee
+  const formattedPrice = formatCartPrice(displayPrice)
   const variantImages = parseListField(variant?.image_urls || variant?.image_url)
   const image = variantImages[selectedImageIndex] || variantImages[0] || "https://via.placeholder.com/600"
   const categories = parseListField(product.categories || product.category)
@@ -212,6 +219,11 @@ function ProductDetails() {
       return
     }
 
+    if (isMadeJustForYou && hasCustomBase && !customBaseText.trim()) {
+      setCartError("Please enter the name or text for the custom base.")
+      return
+    }
+
     setIsAddingToCart(true)
 
     try {
@@ -233,6 +245,8 @@ function ProductDetails() {
         quantity,
         price,
         customImageUrl,
+        customBaseText: hasCustomBase ? customBaseText : "",
+        customBaseFee,
       })
 
       setCartMessage("Added to cart.")
@@ -244,6 +258,12 @@ function ProductDetails() {
     } finally {
       setIsAddingToCart(false)
     }
+  }
+
+  const handleCustomBaseTextChange = (event) => {
+    setCartMessage("")
+    setCartError("")
+    setCustomBaseText(event.target.value.slice(0, CUSTOM_BASE_TEXT_MAX_LENGTH))
   }
 
   const handleCustomImageChange = (event) => {
@@ -425,6 +445,41 @@ function ProductDetails() {
                   accept="image/*"
                   onChange={handleCustomImageChange}
                 />
+
+                <label className={`custom-base-option ${hasCustomBase ? "selected" : ""}`}>
+                  <input
+                    type="checkbox"
+                    checked={hasCustomBase}
+                    onChange={(event) => {
+                      setHasCustomBase(event.target.checked)
+                      setCartMessage("")
+                      setCartError("")
+
+                      if (!event.target.checked) {
+                        setCustomBaseText("")
+                      }
+                    }}
+                  />
+                  <span>
+                    <strong>Add base with custom name/text</strong>
+                    <small>+{formatCartPrice(CUSTOM_BASE_FEE)}</small>
+                  </span>
+                </label>
+
+                {hasCustomBase && (
+                  <label className="custom-base-text" htmlFor="customBaseText">
+                    <span>Base text</span>
+                    <input
+                      id="customBaseText"
+                      type="text"
+                      value={customBaseText}
+                      onChange={handleCustomBaseTextChange}
+                      maxLength={CUSTOM_BASE_TEXT_MAX_LENGTH}
+                      placeholder="Name or short text"
+                    />
+                    <small>{customBaseText.length}/{CUSTOM_BASE_TEXT_MAX_LENGTH} characters</small>
+                  </label>
+                )}
               </div>
             )}
 

@@ -143,6 +143,13 @@
     text-decoration: underline;
 }
 
+.cart-custom-base {
+    width: fit-content;
+    color: #6a3d4c;
+    font-size: 0.84rem;
+    font-weight: 800;
+}
+
 .cart-item-details p {
     color: var(--color-primary);
     font-size: 0.98rem;

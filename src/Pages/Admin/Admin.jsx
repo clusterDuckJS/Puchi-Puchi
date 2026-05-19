@@ -28,38 +28,17 @@ const currency = new Intl.NumberFormat("en-IN", {
   maximumFractionDigits: 0,
 });
 
-const metrics = [
-  { label: "Total Revenue", value: currency.format(28000), icon: LuIndianRupee },
-  { label: "Active Orders", value: "3", icon: LuBoxes },
-  { label: "Orders Today", value: "0", icon: LuChartNoAxesCombined },
-  { label: "Total Users", value: "6", icon: LuUsers },
-  { label: "Products", value: "6", icon: LuShoppingBag },
+const ORDER_STAGE_OPTIONS = [
+  { value: "paid", label: "Paid" },
+  { value: "magic_modelling", label: "Magic Modelling" },
+  { value: "curing_chamber", label: "Curing Chamber" },
+  { value: "final_touches", label: "Final Touches" },
+  { value: "ready_to_ship", label: "Ready to Ship" },
+  { value: "delivered", label: "Delivered" },
 ];
 
-const topProducts = [
-  { name: "Magical Girl Sakura", sold: "2 sold" },
-  { name: "Usagi-chan", sold: "2 sold" },
-  { name: "Little Witch Momo", sold: "1 sold" },
-  { name: "Neko-chan", sold: "1 sold" },
-  { name: "Hana the Fairy", sold: "1 sold" },
-];
-
-const orders = [
-  { id: "PP-1042", customer: "Aiko Tanaka", email: "aiko@example.com", items: "3 item(s)", total: currency.format(9400), date: "5/16/2026", status: "Curing Chamber", stage: "4. Curing Chamber", accent: true },
-  { id: "PP-1041", customer: "Rohan Mehta", email: "rohan.m@example.com", items: "1 item(s)", total: currency.format(4200), date: "5/14/2026", status: "Final Touches", stage: "6. Final Touches", accent: true },
-  { id: "PP-1040", customer: "Sara Kim", email: "sara.k@example.com", items: "1 item(s)", total: currency.format(3500), date: "5/12/2026", status: "Delivered", stage: "7. Ready to Ship" },
-  { id: "PP-1039", customer: "Liam Park", email: "liam@example.com", items: "2 item(s)", total: currency.format(7100), date: "5/17/2026", status: "Magic Modelling", stage: "2. Magic Modelling", accent: true },
-  { id: "PP-1038", customer: "Mei Wong", email: "mei.w@example.com", items: "1 item(s)", total: currency.format(3800), date: "5/8/2026", status: "Delivered", stage: "7. Ready to Ship" },
-];
-
-const users = [
-  { id: "U-001", name: "Aiko Tanaka", email: "aiko@example.com", joined: "4/3/2026", orders: "3", spent: currency.format(11200) },
-  { id: "U-002", name: "Rohan Mehta", email: "rohan.m@example.com", joined: "4/18/2026", orders: "1", spent: currency.format(4200) },
-  { id: "U-003", name: "Sara Kim", email: "sara.k@example.com", joined: "3/19/2026", orders: "2", spent: currency.format(6800) },
-  { id: "U-004", name: "Liam Park", email: "liam@example.com", joined: "5/6/2026", orders: "1", spent: currency.format(7100) },
-  { id: "U-005", name: "Mei Wong", email: "mei.w@example.com", joined: "2/17/2026", orders: "4", spent: currency.format(14600) },
-  { id: "U-006", name: "Noah Singh", email: "noah.s@example.com", joined: "5/13/2026", orders: "0", spent: currency.format(0) },
-];
+const USER_DISPLAY_ID_START = 1;
+const ORDER_DISPLAY_ID_START = 177;
 
 const adminNav = [
   { to: "/admin", label: "Overview", icon: LuLayoutDashboard, end: true },
@@ -123,6 +102,46 @@ const centsToRupees = (value) => {
 
 const rupeesToCents = (value) => Math.round(Number(value || 0) * 100);
 
+const getProfileName = (profile) => (
+  [profile?.first_name, profile?.last_name].filter(Boolean).join(" ") ||
+  profile?.email ||
+  "Customer"
+);
+
+const formatDisplayId = (value) => String(value).padStart(4, "0");
+
+const withSequentialDisplayIds = (items, startAt) => {
+  const displayIdsById = [...items]
+    .sort((a, b) => new Date(a.created_at || 0) - new Date(b.created_at || 0))
+    .reduce((map, item, index) => ({
+      ...map,
+      [item.id]: formatDisplayId(startAt + index),
+    }), {});
+
+  return items.map((item) => ({
+    ...item,
+    display_id: displayIdsById[item.id],
+  }));
+};
+
+const formatOrderDate = (value) => {
+  if (!value) return "";
+
+  return new Intl.DateTimeFormat("en-IN", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  }).format(new Date(value));
+};
+
+const formatOrderStatus = (status) => {
+  const option = ORDER_STAGE_OPTIONS.find((item) => item.value === status);
+
+  if (option) return option.label;
+
+  return normalizeListValue(String(status || "confirmed").replace(/_/g, " "));
+};
+
 function PageHeader({ title, description, action }) {
   return (
     <header className="admin-page-header">
@@ -142,7 +161,7 @@ function SearchField({ placeholder, value, onChange }) {
       <input
         type="search"
         placeholder={placeholder}
-        value={value}
+        value={value ?? ""}
         onChange={(event) => onChange?.(event.target.value)}
       />
     </label>
@@ -150,6 +169,128 @@ function SearchField({ placeholder, value, onChange }) {
 }
 
 function OverviewPage() {
+  const [metrics, setMetrics] = useState([]);
+  const [topProducts, setTopProducts] = useState([]);
+  const [recentOrders, setRecentOrders] = useState([]);
+  const [profilesById, setProfilesById] = useState({});
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  const fetchOverview = useCallback(async () => {
+    setLoading(true);
+    setError("");
+
+    try {
+      const [
+        ordersResult,
+        productsResult,
+        profilesResult,
+      ] = await Promise.all([
+        withRequestTimeout(supabase
+          .from("orders")
+          .select(`
+            id,
+            user_id,
+            total_amount,
+            status,
+            created_at,
+            order_items (
+              quantity,
+              products (
+                id,
+                name
+              )
+            )
+          `)
+          .neq("status", "pending")
+          .order("created_at", { ascending: false })),
+        withRequestTimeout(supabase
+          .from("products")
+          .select("id", { count: "exact", head: true })
+          .eq("is_active", true)),
+        withRequestTimeout(supabase
+          .from("profiles")
+          .select("id, first_name, last_name, email", { count: "exact" })),
+      ]);
+
+      if (ordersResult.error) throw ordersResult.error;
+      if (productsResult.error) throw productsResult.error;
+      if (profilesResult.error) throw profilesResult.error;
+
+      const orders = withSequentialDisplayIds(ordersResult.data || [], ORDER_DISPLAY_ID_START);
+      const profiles = profilesResult.data || [];
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
+
+      const profileMap = profiles.reduce((map, profile) => ({
+        ...map,
+        [profile.id]: profile,
+      }), {});
+      const productSales = new Map();
+
+      orders.forEach((order) => {
+        (order.order_items || []).forEach((item) => {
+          const product = item.products || {};
+          const productId = product.id || product.name;
+
+          if (!productId) return;
+
+          const current = productSales.get(productId) || {
+            name: product.name || "Puchi Puchi item",
+            quantity: 0,
+          };
+
+          productSales.set(productId, {
+            ...current,
+            quantity: current.quantity + (item.quantity || 0),
+          });
+        });
+      });
+
+      const totalRevenue = orders.reduce((sum, order) => sum + (order.total_amount || 0), 0);
+      const activeOrders = orders.filter((order) => order.status !== "delivered").length;
+      const ordersToday = orders.filter((order) => (
+        order.created_at && new Date(order.created_at) >= todayStart
+      )).length;
+
+      setMetrics([
+        { label: "Total Revenue", value: currency.format(totalRevenue / 100), icon: LuIndianRupee },
+        { label: "Active Orders", value: String(activeOrders), icon: LuBoxes },
+        { label: "Orders Today", value: String(ordersToday), icon: LuChartNoAxesCombined },
+        { label: "Total Users", value: String(profilesResult.count || profiles.length), icon: LuUsers },
+        { label: "Products", value: String(productsResult.count || 0), icon: LuShoppingBag },
+      ]);
+      setTopProducts(
+        Array.from(productSales.values())
+          .sort((a, b) => b.quantity - a.quantity)
+          .slice(0, 5)
+          .map((product) => ({
+            name: product.name,
+            sold: `${product.quantity} sold`,
+          }))
+      );
+      setRecentOrders(orders.slice(0, 5));
+      setProfilesById(profileMap);
+    } catch (error) {
+      console.error("Admin overview error:", error);
+      setError(
+        isTimeoutError(error)
+          ? "Overview data is taking too long to load. Please refresh in a moment."
+          : "We could not load overview data right now."
+      );
+      setMetrics([]);
+      setTopProducts([]);
+      setRecentOrders([]);
+      setProfilesById({});
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchOverview();
+  }, [fetchOverview]);
+
   return (
     <>
       <PageHeader
@@ -157,6 +298,11 @@ function OverviewPage() {
         description="Welcome back! Here's what's happening at Puchi Puchi today."
       />
 
+      {loading && <p className="admin-status-message">Loading overview...</p>}
+      {!loading && error && <p className="admin-status-message text-error">{error}</p>}
+
+      {!loading && !error && (
+      <>
       <div className="admin-metrics">
         {metrics.map((metric) => {
           const Icon = metric.icon;
@@ -176,45 +322,218 @@ function OverviewPage() {
       <div className="admin-dashboard-grid">
         <section className="admin-panel">
           <h2>Top Products</h2>
-          <div className="admin-product-list">
-            {topProducts.map((product, index) => (
+          {topProducts.length > 0 ? (
+            <div className="admin-product-list">
+              {topProducts.map((product, index) => (
               <div className="admin-product-row" key={product.name}>
                 <span className="admin-rank">{index + 1}</span>
                 <span className="admin-product-name">{product.name}</span>
                 <span className="admin-sold-count">{product.sold}</span>
               </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          ) : (
+            <p className="admin-empty-panel">No completed order items yet.</p>
+          )}
         </section>
 
         <section className="admin-panel">
           <h2>Recent Orders</h2>
-          <div className="admin-order-list">
-            {orders.map((order) => (
+          {recentOrders.length > 0 ? (
+            <div className="admin-order-list">
+              {recentOrders.map((order) => {
+                const customer = getProfileName(profilesById[order.user_id]);
+
+                return (
               <div className="admin-order-row" key={order.id}>
                 <div>
-                  <p>{order.id}</p>
-                  <span>{order.customer}</span>
+                  <p>#{order.display_id}</p>
+                  <span>{customer}</span>
                 </div>
-                <strong>{order.total}</strong>
+                <strong>{currency.format((order.total_amount || 0) / 100)}</strong>
               </div>
-            ))}
-          </div>
+                );
+              })}
+            </div>
+          ) : (
+            <p className="admin-empty-panel">No orders yet.</p>
+          )}
         </section>
       </div>
+      </>
+      )}
     </>
   );
 }
 
 function OrdersPage() {
+  const [orderRows, setOrderRows] = useState([]);
+  const [profilesById, setProfilesById] = useState({});
+  const [query, setQuery] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [savingStatusId, setSavingStatusId] = useState("");
+
+  const fetchOrders = useCallback(async () => {
+    setLoading(true);
+    setError("");
+
+    try {
+      const { data, error: ordersError } = await withRequestTimeout(supabase
+        .from("orders")
+        .select(`
+          id,
+          user_id,
+          total_amount,
+          status,
+          created_at,
+          order_items (
+            id,
+            quantity,
+            price,
+            products (
+              id,
+              name,
+              category,
+              categories
+            ),
+            product_variants (
+              name,
+              image_url,
+              image_urls
+            ),
+            custom_uploads (
+              id,
+              image_url,
+              base_text,
+              base_fee,
+              status,
+              notes
+            )
+          )
+        `)
+        .neq("status", "pending")
+        .order("created_at", { ascending: false }));
+
+      if (ordersError) throw ordersError;
+
+      const fetchedOrders = withSequentialDisplayIds(data || [], ORDER_DISPLAY_ID_START);
+      setOrderRows(fetchedOrders);
+
+      const userIds = [...new Set(fetchedOrders.map((order) => order.user_id).filter(Boolean))];
+
+      if (userIds.length === 0) {
+        setProfilesById({});
+        return;
+      }
+
+      const { data: profiles, error: profilesError } = await withRequestTimeout(supabase
+        .from("profiles")
+        .select("id, first_name, last_name, email, phone")
+        .in("id", userIds));
+
+      if (profilesError) throw profilesError;
+
+      setProfilesById(
+        (profiles || []).reduce((map, profile) => ({
+          ...map,
+          [profile.id]: profile,
+        }), {})
+      );
+    } catch (error) {
+      console.error("Admin orders error:", error);
+      setError(
+        isTimeoutError(error)
+          ? "Orders are taking too long to load. Please refresh in a moment."
+          : "We could not load orders right now."
+      );
+      setOrderRows([]);
+      setProfilesById({});
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchOrders();
+  }, [fetchOrders]);
+
+  const updateOrderStatus = async (orderId, status) => {
+    setSavingStatusId(orderId);
+    setError("");
+
+    try {
+      const { error: updateError } = await supabase
+        .from("orders")
+        .update({ status })
+        .eq("id", orderId);
+
+      if (updateError) throw updateError;
+
+      setOrderRows((current) => current.map((order) => (
+        order.id === orderId ? { ...order, status } : order
+      )));
+    } catch (error) {
+      console.error("Order status update error:", error);
+      setError("We could not update that order stage.");
+    } finally {
+      setSavingStatusId("");
+    }
+  };
+
+  const getCustomer = useCallback((order) => {
+    const profile = profilesById[order.user_id] || {};
+    const name = [profile.first_name, profile.last_name].filter(Boolean).join(" ");
+
+    return {
+      name: name || "Customer",
+      email: profile.email || "No email saved",
+    };
+  }, [profilesById]);
+
+  const filteredOrders = useMemo(() => {
+    const searchTerm = query.trim().toLowerCase();
+
+    if (!searchTerm) return orderRows;
+
+    return orderRows.filter((order) => {
+      const customer = getCustomer(order);
+      const itemsText = (order.order_items || []).map((item) => {
+        const customUpload = item.custom_uploads?.[0] || {};
+
+        return [
+          item.products?.name,
+          item.product_variants?.name,
+          customUpload.base_text,
+        ].filter(Boolean).join(" ");
+      }).join(" ");
+
+      return [
+        order.id,
+        order.display_id,
+        customer.name,
+        customer.email,
+        order.status,
+        itemsText,
+      ].filter(Boolean).join(" ").toLowerCase().includes(searchTerm);
+    });
+  }, [getCustomer, orderRows, query]);
+
   return (
     <>
       <PageHeader
         title="Orders"
         description="Manage all customer orders and production status."
-        action={<SearchField placeholder="Search orders..." />}
+        action={<SearchField placeholder="Search orders..." value={query} onChange={setQuery} />}
       />
 
+      {loading && <p className="admin-status-message">Loading orders...</p>}
+      {!loading && error && <p className="admin-status-message text-error">{error}</p>}
+      {!loading && !error && filteredOrders.length === 0 && (
+        <p className="admin-status-message">No orders found.</p>
+      )}
+
+      {!loading && !error && filteredOrders.length > 0 && (
       <div className="admin-table-card">
         <table>
           <thead>
@@ -229,44 +548,180 @@ function OrdersPage() {
             </tr>
           </thead>
           <tbody>
-            {orders.map((order) => (
-              <tr key={order.id}>
-                <td>{order.id}</td>
-                <td>
-                  <p>{order.customer}</p>
-                  <span>{order.email}</span>
-                </td>
-                <td>{order.items}</td>
-                <td>{order.total}</td>
-                <td>{order.date}</td>
-                <td>
-                  <span className={`admin-status ${order.accent ? "accent" : ""}`}>
-                    {order.status}
-                  </span>
-                </td>
-                <td>
-                  <select value={order.stage} onChange={() => {}} aria-label={`${order.id} stage`}>
-                    <option>{order.stage}</option>
-                  </select>
-                </td>
-              </tr>
-            ))}
+            {filteredOrders.map((order) => {
+              const customer = getCustomer(order);
+              const itemCount = (order.order_items || []).reduce(
+                (count, item) => count + (item.quantity || 0),
+                0
+              );
+
+              return (
+                <tr key={order.id}>
+                  <td>#{order.display_id}</td>
+                  <td>
+                    <p>{customer.name}</p>
+                    <span>{customer.email}</span>
+                  </td>
+                  <td>
+                    <div className="admin-order-items">
+                      <strong>{itemCount} item{itemCount === 1 ? "" : "s"}</strong>
+                      {(order.order_items || []).map((item) => {
+                        const product = item.products || {};
+                        const variant = item.product_variants || {};
+                        const customUpload = item.custom_uploads?.[0];
+
+                        return (
+                          <div className="admin-order-item-detail" key={item.id}>
+                            <span>
+                              {item.quantity || 1} x {product.name || "Puchi Puchi item"}
+                              {variant.name ? ` - ${variant.name}` : ""}
+                            </span>
+                            {customUpload?.base_text && (
+                              <em>
+                                Base text: {customUpload.base_text}
+                                {customUpload.base_fee ? ` (+${currency.format(customUpload.base_fee / 100)})` : ""}
+                              </em>
+                            )}
+                            {customUpload?.image_url && (
+                              <a href={customUpload.image_url} target="_blank" rel="noreferrer">
+                                View custom pic
+                              </a>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </td>
+                  <td>{currency.format((order.total_amount || 0) / 100)}</td>
+                  <td>{formatOrderDate(order.created_at)}</td>
+                  <td>
+                    <span className={`admin-status ${order.status !== "delivered" ? "accent" : ""}`}>
+                      {formatOrderStatus(order.status)}
+                    </span>
+                  </td>
+                  <td>
+                    <select
+                      value={order.status || "paid"}
+                      onChange={(event) => updateOrderStatus(order.id, event.target.value)}
+                      aria-label={`${order.id} stage`}
+                      disabled={savingStatusId === order.id}
+                    >
+                      {ORDER_STAGE_OPTIONS.map((stage) => (
+                        <option value={stage.value} key={stage.value}>{stage.label}</option>
+                      ))}
+                    </select>
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
+      )}
     </>
   );
 }
 
 function UsersPage() {
+  const [userRows, setUserRows] = useState([]);
+  const [query, setQuery] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  const fetchUsers = useCallback(async () => {
+    setLoading(true);
+    setError("");
+
+    try {
+      const [profilesResult, ordersResult] = await Promise.all([
+        withRequestTimeout(supabase
+          .from("profiles")
+          .select("id, first_name, last_name, email, created_at")
+          .order("created_at", { ascending: false })),
+        withRequestTimeout(supabase
+          .from("orders")
+          .select("id, user_id, total_amount, status")
+          .neq("status", "pending")),
+      ]);
+
+      if (profilesResult.error) throw profilesResult.error;
+      if (ordersResult.error) throw ordersResult.error;
+
+      const orderStatsByUserId = (ordersResult.data || []).reduce((map, order) => {
+        const current = map[order.user_id] || {
+          count: 0,
+          spent: 0,
+        };
+
+        return {
+          ...map,
+          [order.user_id]: {
+            count: current.count + 1,
+            spent: current.spent + (order.total_amount || 0),
+          },
+        };
+      }, {});
+
+      setUserRows(withSequentialDisplayIds(profilesResult.data || [], USER_DISPLAY_ID_START).map((profile) => {
+        const stats = orderStatsByUserId[profile.id] || {
+          count: 0,
+          spent: 0,
+        };
+
+        return {
+          ...profile,
+          name: getProfileName(profile),
+          orderCount: stats.count,
+          totalSpent: stats.spent,
+        };
+      }));
+    } catch (error) {
+      console.error("Admin users error:", error);
+      setError(
+        isTimeoutError(error)
+          ? "Users are taking too long to load. Please refresh in a moment."
+          : "We could not load users right now."
+      );
+      setUserRows([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchUsers();
+  }, [fetchUsers]);
+
+  const filteredUsers = useMemo(() => {
+    const searchTerm = query.trim().toLowerCase();
+
+    if (!searchTerm) return userRows;
+
+    return userRows.filter((user) => (
+      [
+        user.id,
+        user.display_id,
+        user.name,
+        user.email,
+      ].filter(Boolean).join(" ").toLowerCase().includes(searchTerm)
+    ));
+  }, [query, userRows]);
+
   return (
     <>
       <PageHeader
         title="Users"
         description="All registered customers."
-        action={<SearchField placeholder="Search users..." />}
+        action={<SearchField placeholder="Search users..." value={query} onChange={setQuery} />}
       />
 
+      {loading && <p className="admin-status-message">Loading users...</p>}
+      {!loading && error && <p className="admin-status-message text-error">{error}</p>}
+      {!loading && !error && filteredUsers.length === 0 && (
+        <p className="admin-status-message">No users found.</p>
+      )}
+
+      {!loading && !error && filteredUsers.length > 0 && (
       <div className="admin-table-card">
         <table>
           <thead>
@@ -280,19 +735,20 @@ function UsersPage() {
             </tr>
           </thead>
           <tbody>
-            {users.map((user) => (
+            {filteredUsers.map((user) => (
               <tr key={user.id}>
-                <td>{user.id}</td>
+                <td>{user.display_id}</td>
                 <td>{user.name}</td>
-                <td>{user.email}</td>
-                <td>{user.joined}</td>
-                <td>{user.orders}</td>
-                <td>{user.spent}</td>
+                <td>{user.email || "No email saved"}</td>
+                <td>{formatOrderDate(user.created_at) || "Unknown"}</td>
+                <td>{user.orderCount}</td>
+                <td>{currency.format(user.totalSpent / 100)}</td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
+      )}
     </>
   );
 }

@@ -1,6 +1,7 @@
 import { supabase } from "./supabase"
 
 export const CART_UPDATED_EVENT = "puchi-cart-updated"
+export const CUSTOM_BASE_FEE = 10000
 
 export const formatCartPrice = (amount = 0) =>
   `\u20b9${((amount || 0) / 100).toLocaleString("en-IN")}`
@@ -92,6 +93,8 @@ export const addItemToCart = async ({
   quantity,
   price,
   customImageUrl,
+  customBaseText = "",
+  customBaseFee = 0,
 }) => {
   if (!userId) {
     throw new Error("Please log in before adding items to your cart.")
@@ -104,6 +107,9 @@ export const addItemToCart = async ({
   const order = await getOrCreatePendingOrder(userId)
   const nextQuantity = Math.max(1, Number(quantity) || 1)
   const hasCustomUpload = Boolean(customImageUrl)
+  const normalizedBaseText = customBaseText.trim().slice(0, 40)
+  const baseFee = normalizedBaseText ? Number(customBaseFee) || 0 : 0
+  const itemPrice = price + baseFee
 
   let cartItem = null
 
@@ -124,7 +130,7 @@ export const addItemToCart = async ({
         .from("order_items")
         .update({
           quantity: (existingItem.quantity || 0) + nextQuantity,
-          price,
+          price: itemPrice,
         })
         .eq("id", existingItem.id)
         .select("id, order_id, product_id, variant_id, quantity, price")
@@ -144,7 +150,7 @@ export const addItemToCart = async ({
         product_id: productId,
         variant_id: variantId,
         quantity: nextQuantity,
-        price,
+        price: itemPrice,
       })
       .select("id, order_id, product_id, variant_id, quantity, price")
       .single()
@@ -160,6 +166,8 @@ export const addItemToCart = async ({
       .insert({
         order_item_id: cartItem.id,
         image_url: customImageUrl,
+        base_text: normalizedBaseText || null,
+        base_fee: baseFee,
         status: "pending",
       })
 
@@ -260,6 +268,8 @@ export const fetchCart = async (userId) => {
       custom_uploads (
         id,
         image_url,
+        base_text,
+        base_fee,
         status,
         notes
       )

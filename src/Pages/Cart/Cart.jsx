@@ -303,6 +303,12 @@ function Cart() {
                               View uploaded reference
                             </a>
                           )}
+                          {customUpload?.base_text && (
+                            <span className="cart-custom-base">
+                              Base text: {customUpload.base_text}
+                              {customUpload.base_fee ? ` (+${formatCartPrice(customUpload.base_fee)})` : ""}
+                            </span>
+                          )}
                           <p>{formatCartPrice(item.price)}</p>
 
                           <div className="cart-quantity-stepper" aria-label="Quantity selector">

@@ -1,8 +1,7 @@
 .home-section {
     gap: 1rem;
-    background:
-        radial-gradient(circle at 50% 0%, rgb(255 231 238 / 70%), transparent 18rem),
-        #fff5f7;
+    padding: 6rem max(2rem, calc((100vw - 1216px) / 2 + 2rem));
+    background: #fff5f8;
 }
 
 .home-section > .tag {
@@ -24,14 +23,14 @@
 
 .home-section .children {
     width: 100%;
-    margin-top: 2.8rem;
+    margin-top: 3rem;
 }
 
 .steps-grid,
 .product-grid {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 2rem;
+    gap: 1.5rem;
     width: 100%;
 }
 
@@ -44,9 +43,9 @@
     justify-content: center;
     gap: 1.25rem;
     border: 0;
-    border-radius: 1.3rem;
-    background: #fffdfb;
-    box-shadow: 0 18px 45px rgb(221 95 137 / 10%);
+    border-radius: 1.5rem;
+    background: #fefcfa;
+    box-shadow: 0 8px 30px -8px rgb(221 95 137 / 12%);
 }
 
 .step-icon {
@@ -91,10 +90,11 @@
     justify-content: center;
     gap: clamp(1.25rem, 6vw, 4.5rem);
     width: 100%;
-    margin-top: 2.5rem;
-    padding: 1rem 1.5rem;
+    margin-top: 2rem;
+    padding: 2rem 1.5rem;
     border-radius: 999px;
-    background: #fef0eb;
+    background: rgb(253 245 237 / 50%);
+    border: 1px solid #f3e2e5;
     color: #4f313b;
 }
 
@@ -110,13 +110,22 @@
 }
 
 .product-section {
-    padding-top: 7rem;
+    padding-top: 6rem;
+    padding-bottom: 6rem;
+}
+
+.product-section:not(.best-seller-section) {
+    background: rgb(251 228 223 / 30%);
+}
+
+.home .product-card.card {
+    border-radius: 1.5rem;
+    background: #fefcfa;
+    box-shadow: 0 8px 30px -8px rgb(221 95 137 / 12%);
 }
 
 .best-seller-section {
-    background:
-        radial-gradient(circle at 50% 0%, rgb(255 231 238 / 56%), transparent 18rem),
-        linear-gradient(180deg, #fff5f7 0%, #fff9fb 100%);
+    background: #fff5f8;
 }
 
 .view-all-btn {
@@ -135,6 +144,10 @@
 }
 
 @media screen and (max-width: 1024px) {
+    .home-section {
+        padding: 5rem 4rem;
+    }
+
     .steps-grid,
     .product-grid {
         grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -147,6 +160,10 @@
 }
 
 @media screen and (max-width: 768px) {
+    .home-section {
+        padding: 4.5rem 1rem;
+    }
+
     .home-section .children {
         margin-top: 2rem;
     }

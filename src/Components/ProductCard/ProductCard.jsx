@@ -7,11 +7,27 @@ const parseListField = (value) => {
   return String(value).split(',').map((item) => item.trim()).filter(Boolean)
 }
 
+const getVariantDisplayPrice = (variant) => {
+  const discountPrice = Number(variant.discount_price)
+  const price = Number(variant.price)
+
+  if (Number.isFinite(discountPrice) && discountPrice > 0) return discountPrice
+  if (Number.isFinite(price) && price > 0) return price
+  return null
+}
+
+const getLowestVariantPrice = (variants) => {
+  const prices = variants
+    .filter((variant) => variant.is_active !== false)
+    .map(getVariantDisplayPrice)
+    .filter((price) => price !== null)
+
+  return prices.length ? Math.min(...prices) : 0
+}
+
 function ProductCard({ product, onClick }) {
   const variants = product.product_variants || []
-  const minPrice = variants.length
-    ? Math.min(...variants.map(v => v.discount_price || v.price))
-    : 0
+  const minPrice = getLowestVariantPrice(variants)
   const formattedPrice = `\u20b9${(minPrice / 100).toLocaleString("en-IN")}`
   const categories = parseListField(product.categories || product.category)
   const image =

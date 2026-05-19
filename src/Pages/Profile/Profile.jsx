@@ -176,6 +176,12 @@ function OrdersTab({ orders, loading, error }) {
                           View uploaded reference
                         </a>
                       )}
+                      {customUpload?.base_text && (
+                        <small>
+                          Base text: {customUpload.base_text}
+                          {customUpload.base_fee ? ` (+${formatCartPrice(customUpload.base_fee)})` : ""}
+                        </small>
+                      )}
                     </div>
                     <strong>{formatCartPrice(itemTotal)}</strong>
                   </div>
@@ -460,6 +466,8 @@ function Profile({ user, profile, onProfileUpdated }) {
             custom_uploads (
               id,
               image_url,
+              base_text,
+              base_fee,
               status,
               notes
             )
