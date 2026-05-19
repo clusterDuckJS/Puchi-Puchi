@@ -1,7 +1,6 @@
-import React from 'react'
 import './auth.css'
 import { createPortal } from 'react-dom';
-import { LuCross, LuX } from 'react-icons/lu';
+import { LuX } from 'react-icons/lu';
 function AuthModal({ isOpen, onClose, children }) {
     if (!isOpen) return null;
 

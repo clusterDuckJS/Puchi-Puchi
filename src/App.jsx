@@ -17,6 +17,20 @@ import Admin from './Pages/Admin/Admin';
 import Cart from './Pages/Cart/Cart';
 import PaymentStatus from './Pages/PaymentStatus/PaymentStatus';
 
+function ScrollToTop() {
+  const { pathname } = useLocation();
+
+  useEffect(() => {
+    if ("scrollRestoration" in window.history) {
+      window.history.scrollRestoration = "manual";
+    }
+
+    window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+  }, [pathname]);
+
+  return null;
+}
+
 function App() {
   const [session, setSession] = useState(null);
   const [profile, setProfile] = useState(null);
@@ -145,6 +159,8 @@ function App() {
 
   return (
     <>
+      <ScrollToTop />
+
       {!isAdminRoute && (
         <Header
           key={session?.user?.id ?? "guest"}

@@ -1,4 +1,4 @@
-import { FaInstagram, FaTwitter } from "react-icons/fa";
+import { FaInstagram, FaReddit, FaTwitter } from "react-icons/fa";
 import { Link } from "react-router-dom";
 import LOGO from "../../assets/puchi_logo_tran.svg";
 import "./footer.css";
@@ -9,14 +9,14 @@ function Footer() {
       <div className="footer-content">
         <div className="footer-brand">
           <img className="footer-logo" src={LOGO} alt="Puchi Puchi" />
-          <p>Tiny figurines, big feelings. Handcrafted chibi figurines made with love and care, just for you.</p>
+          <p>Tiny figurines, big feelings. Handcrafted mini figurines made with love and care, just for you.</p>
 
           <div className="footer-socials" aria-label="Social links">
-            <a href="https://instagram.com" aria-label="Instagram">
+            <a href="https://www.instagram.com/puchi.puchi.0_0/" aria-label="Instagram">
               <FaInstagram />
             </a>
-            <a href="https://twitter.com" aria-label="Twitter">
-              <FaTwitter />
+            <a href="https://www.reddit.com/user/Landlord04001/" aria-label="Reddit">
+              <FaReddit />
             </a>
           </div>
         </div>
@@ -24,7 +24,7 @@ function Footer() {
         <nav className="footer-nav" aria-label="Shop">
           <h6>Shop</h6>
           <Link to="/shop">All Figurines</Link>
-          <Link to="/#custom-chibi">Custom Chibi</Link>
+          {/* <Link to="/#custom-chibi">Custom Minis</Link> */}
           <Link to="/shop">New Arrivals</Link>
         </nav>
 
@@ -32,7 +32,7 @@ function Footer() {
           <h6>Help</h6>
           <Link to="/about">About Us</Link>
           <Link to="/faq">Shipping Info</Link>
-          <a href="mailto:hello@puchipuchi.in">Contact</a>
+          <a href="mailto:puchipuchi073@gmail.com">Contact</a>
         </nav>
       </div>
 

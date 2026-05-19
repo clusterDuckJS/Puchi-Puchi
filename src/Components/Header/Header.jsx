@@ -12,6 +12,7 @@ function Header({ profile, user }) {
   const navigate = useNavigate();
   const location = useLocation();
   const [openAuth, setOpenAuth] = useState(false);
+  const [authMode, setAuthMode] = useState("login");
   const [openMenu, setOpenMenu] = useState(false);
   const [openSearch, setOpenSearch] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -101,6 +102,12 @@ function Header({ profile, user }) {
 
   const closeMobileMenu = () => {
     setOpenMenu(false);
+  };
+
+  const openAuthModal = (mode) => {
+    closeMobileMenu();
+    setAuthMode(mode);
+    setOpenAuth(true);
   };
 
   const navigateToSearch = (query, options = {}) => {
@@ -249,20 +256,14 @@ function Header({ profile, user }) {
                 <button
                   className="login-link"
                   type="button"
-                  onClick={() => {
-                    closeMobileMenu();
-                    setOpenAuth(true);
-                  }}
+                  onClick={() => openAuthModal("login")}
                 >
                   Log In
                 </button>
                 <button
                   className="signup-btn"
                   type="button"
-                  onClick={() => {
-                    closeMobileMenu();
-                    setOpenAuth(true);
-                  }}
+                  onClick={() => openAuthModal("signup")}
                 >
                   Sign Up
                 </button>
@@ -286,7 +287,7 @@ function Header({ profile, user }) {
       </header>
 
       <AuthModal isOpen={openAuth} onClose={() => setOpenAuth(false)}>
-        <AuthForm onAuthSuccess={() => setOpenAuth(false)} />
+        <AuthForm initialMode={authMode} onAuthSuccess={() => setOpenAuth(false)} />
       </AuthModal>
     </>
   );

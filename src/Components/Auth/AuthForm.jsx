@@ -1,12 +1,13 @@
 import { useState } from "react";
+import { FcGoogle } from "react-icons/fc";
 import { useNavigate } from "react-router-dom";
+import LOGO from "../../assets/puchi_logo_tran.svg";
 import { supabase } from "../../utils/supabase";
 import "./auth.css";
-import LOGO from "../../assets/puchi_logo_tran.svg";
 
-function AuthForm({ onAuthSuccess }) {
+function AuthForm({ initialMode = "login", onAuthSuccess }) {
   const navigate = useNavigate();
-  const [isLogin, setIsLogin] = useState(true);
+  const [isLogin, setIsLogin] = useState(initialMode !== "signup");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [phone, setPhone] = useState("");
@@ -15,6 +16,7 @@ function AuthForm({ onAuthSuccess }) {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [authError, setAuthError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isGoogleSubmitting, setIsGoogleSubmitting] = useState(false);
 
   const switchAuthMode = (nextIsLogin) => {
     setAuthError("");
@@ -31,6 +33,7 @@ function AuthForm({ onAuthSuccess }) {
         email,
         password,
       });
+
       if (error) setAuthError(error.message);
       else {
         onAuthSuccess?.();
@@ -55,6 +58,7 @@ function AuthForm({ onAuthSuccess }) {
           },
         },
       });
+
       if (error) setAuthError(error.message);
       else if (data.session) {
         onAuthSuccess?.();
@@ -68,15 +72,19 @@ function AuthForm({ onAuthSuccess }) {
   };
 
   const handleGoogleLogin = async () => {
+    setAuthError("");
+    setIsGoogleSubmitting(true);
+
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
         redirectTo: `${window.location.origin}/`,
-      }
+      },
     });
 
     if (error) {
-      console.error("Google login error:", error.message);
+      setAuthError(error.message);
+      setIsGoogleSubmitting(false);
     }
   };
 
@@ -85,11 +93,11 @@ function AuthForm({ onAuthSuccess }) {
       <div className="svg-wrapper mb-05">
         <img src={LOGO} alt="Puchi Puchi Logo" />
       </div>
-      <h4 className="center bold-700 mb-1">{isLogin ? "Welcome Back! ✨" : "Join Puchi Puchi 🌸"}</h4>
+      <h4 className="center bold-700 mb-1">{isLogin ? "Welcome Back!" : "Join Puchi Puchi"}</h4>
 
       <div className="flex align-center w-100 switch-btn-container br-15 mb-2">
-        <button className={`flex-1 sm ${isLogin ? "active" : ""}`} onClick={() => switchAuthMode(true)}>Log In</button>
-        <button className={`flex-1 sm ${!isLogin ? "active" : ""}`} onClick={() => switchAuthMode(false)}>Sign Up</button>
+        <button type="button" className={`flex-1 sm ${isLogin ? "active" : ""}`} onClick={() => switchAuthMode(true)}>Log In</button>
+        <button type="button" className={`flex-1 sm ${!isLogin ? "active" : ""}`} onClick={() => switchAuthMode(false)}>Sign Up</button>
       </div>
 
       <form className="w-100 auth-fields" onSubmit={handleAuth}>
@@ -167,7 +175,7 @@ function AuthForm({ onAuthSuccess }) {
             className="w-100 mt-05"
             type="password"
             autoComplete={isLogin ? "current-password" : "new-password"}
-            placeholder="••••••••"
+            placeholder="Password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
@@ -183,7 +191,7 @@ function AuthForm({ onAuthSuccess }) {
               className="w-100 mt-05"
               type="password"
               autoComplete="new-password"
-              placeholder="••••••••"
+              placeholder="Confirm password"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               required
@@ -193,15 +201,23 @@ function AuthForm({ onAuthSuccess }) {
 
         {authError && <p className="auth-error text-error">{authError}</p>}
 
-        <button className="primary w-100 mt-1" type="submit" disabled={isSubmitting}>
+        <button className="primary w-100 mt-1" type="submit" disabled={isSubmitting || isGoogleSubmitting}>
           {isSubmitting ? "Please wait..." : isLogin ? "Log In" : "Create Account"}
         </button>
       </form>
+
+      <div className="auth-divider w-100">
+        <span>or</span>
+      </div>
+
       <button
-        className="secondary w-100 mt-1"
+        className="auth-google-btn w-100"
+        type="button"
         onClick={handleGoogleLogin}
+        disabled={isSubmitting || isGoogleSubmitting}
       >
-        Continue with Google
+        <FcGoogle />
+        <span>{isGoogleSubmitting ? "Opening Google..." : "Continue with Google"}</span>
       </button>
     </div>
   );

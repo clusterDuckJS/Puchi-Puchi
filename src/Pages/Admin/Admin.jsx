@@ -50,6 +50,7 @@ const PRODUCT_CATEGORY_OPTIONS = [
   "Movie",
   "Pets",
   "Made Just for You",
+  "Keychains"
 ];
 
 const normalizeListValue = (value) => value.trim().replace(/\s+/g, " ");
