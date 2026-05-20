@@ -139,7 +139,7 @@ serve(async (request) => {
 
   const { data: address, error: addressError } = await serviceClient
     .from("user_addresses")
-    .select("id, full_name, phone, address_line1, address_line2, city, state, pincode, country")
+    .select("id, label, full_name, phone, address_line1, address_line2, city, state, pincode, country, delivery_notes")
     .eq("id", addressId)
     .eq("user_id", user.id)
     .single()
@@ -236,6 +236,26 @@ serve(async (request) => {
       customer_name: customerName || null,
       customer_email: customerEmail,
       customer_phone: customerPhone || null,
+      total_amount: total,
+      selected_address_id: address.id,
+      delivery_address: {
+        label: address.label,
+        full_name: address.full_name,
+        phone: address.phone,
+        address_line1: address.address_line1,
+        address_line2: address.address_line2,
+        city: address.city,
+        state: address.state,
+        pincode: address.pincode,
+        country: address.country,
+        delivery_notes: address.delivery_notes,
+      },
+      shipping_method: shippingMethod,
+      shipping_amount: shipping,
+      has_insurance: hasInsurance,
+      insurance_amount: insurance,
+      crafting_speed: craftingSpeed,
+      crafting_speed_fee: craftingSpeedFee,
     })
     .eq("id", order.id)
 

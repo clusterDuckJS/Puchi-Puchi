@@ -71,13 +71,14 @@ function OrderProgress({ order }) {
   const stageIndex = getOrderStageIndex(order.status);
   const status = String(order.status || "paid").toLowerCase();
   const isDelivered = status === "delivered";
+  const isCancelled = status === "cancelled" || status === "canceled";
 
   return (
     <div className="profile-order-progress" aria-label="Order production progress">
       <div className="profile-progress-line" />
       {ORDER_STEPS.map((step, index) => {
         const Icon = step.icon;
-        const isDone = index <= stageIndex;
+        const isDone = !isCancelled && index <= stageIndex;
 
         return (
           <div className="profile-progress-step" key={step.key}>

@@ -74,6 +74,10 @@ serve(async (request) => {
     await serviceClient.rpc("assign_order_number", {
       target_order_id: supabaseOrderId,
     })
+
+    await serviceClient.rpc("deduct_order_stock", {
+      target_order_id: supabaseOrderId,
+    })
   }
 
   return jsonResponse({

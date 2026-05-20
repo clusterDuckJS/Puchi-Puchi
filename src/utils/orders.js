@@ -7,6 +7,7 @@ export const ORDER_STAGE_OPTIONS = [
   { value: "final_touches", label: "Final Touches" },
   { value: "dispatched", label: "Dispatched" },
   { value: "delivered", label: "Delivered" },
+  { value: "cancelled", label: "Order Cancelled" },
 ];
 
 export const ORDER_STAGE_INDEX = ORDER_STAGE_OPTIONS.reduce((map, stage, index) => ({
@@ -24,6 +25,7 @@ export const ORDER_STAGE_INDEX = ORDER_STAGE_OPTIONS.reduce((map, stage, index) 
   ready: 6,
   ready_to_ship: 6,
   shipped: 6,
+  canceled: 8,
 });
 
 export const normalizeOrderStatus = (status) => String(status || "paid").trim().toLowerCase();
@@ -136,6 +138,7 @@ export const getCountdownLabel = (order) => {
   const dueDate = getOrderDueDate(order);
 
   if (!dueDate) return "Production timeline pending";
+  if (status === "cancelled" || status === "canceled") return "Order cancelled";
   if (status === "delivered") return "Delivered";
 
   const remaining = getWorkingDaysRemaining(order);

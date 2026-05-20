@@ -168,6 +168,22 @@ const getAdminOrderStatusValue = (status) => (
   status === "ready_to_ship" || status === "shipped" ? "dispatched" : status || "paid"
 );
 
+const formatChoiceLabel = (value) => (
+  String(value || "standard")
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (letter) => letter.toUpperCase())
+);
+
+const formatAddressLine = (address) => (
+  [
+    address?.address_line1,
+    address?.address_line2,
+    address?.city,
+    address?.state,
+    address?.pincode,
+  ].filter(Boolean).join(", ")
+);
+
 function OverviewPage() {
   const [metrics, setMetrics] = useState([]);
   const [topProducts, setTopProducts] = useState([]);
@@ -192,6 +208,15 @@ function OverviewPage() {
           paid_at,
           tracking_id,
           dispatched_at,
+          selected_address_id,
+          delivery_address,
+          shipping_method,
+          shipping_amount,
+          has_insurance,
+          insurance_amount,
+          crafting_speed,
+          crafting_speed_fee,
+          inventory_deducted_at,
           customer_name,
           customer_email,
           customer_phone,
@@ -404,6 +429,14 @@ function OrdersPage() {
           paid_at,
           tracking_id,
           dispatched_at,
+          selected_address_id,
+          delivery_address,
+          shipping_method,
+          shipping_amount,
+          has_insurance,
+          insurance_amount,
+          crafting_speed,
+          crafting_speed_fee,
           customer_name,
           customer_email,
           customer_phone,
@@ -507,8 +540,32 @@ function OrdersPage() {
 
       if (updateError) throw updateError;
 
+      if (status === "cancelled") {
+        const { error: stockError } = await supabase.rpc("restore_order_stock", {
+          target_order_id: orderId,
+        });
+
+        if (stockError) throw stockError;
+      } else if (currentOrder?.status === "cancelled") {
+        const { error: stockError } = await supabase.rpc("deduct_order_stock", {
+          target_order_id: orderId,
+        });
+
+        if (stockError) throw stockError;
+      }
+
       setOrderRows((current) => current.map((order) => (
-        order.id === orderId ? { ...order, ...payload } : order
+        order.id === orderId
+          ? {
+            ...order,
+            ...payload,
+            inventory_deducted_at: status === "cancelled"
+              ? null
+              : currentOrder?.status === "cancelled"
+                ? new Date().toISOString()
+                : order.inventory_deducted_at,
+          }
+          : order
       )));
     } catch (error) {
       console.error("Order status update error:", error);
@@ -581,6 +638,12 @@ function OrdersPage() {
         customer.phone,
         order.status,
         order.tracking_id,
+        order.delivery_address?.full_name,
+        order.delivery_address?.phone,
+        formatAddressLine(order.delivery_address),
+        order.has_insurance ? "armor guarantee" : "no armor",
+        order.shipping_method,
+        order.crafting_speed,
         itemsText,
       ].filter(Boolean).join(" ").toLowerCase().includes(searchTerm);
     });
@@ -607,6 +670,7 @@ function OrdersPage() {
             <tr>
               <th>Order ID</th>
               <th>Customer</th>
+              <th>Delivery</th>
               <th>Items</th>
               <th>Total</th>
               <th>Date</th>
@@ -619,6 +683,7 @@ function OrdersPage() {
           <tbody>
             {filteredOrders.map((order) => {
               const customer = getCustomer(order);
+              const address = order.delivery_address || {};
               const itemCount = (order.order_items || []).reduce(
                 (count, item) => count + (item.quantity || 0),
                 0
@@ -631,6 +696,25 @@ function OrdersPage() {
                     <p>{customer.name}</p>
                     <span>{customer.email}</span>
                     <span>{customer.phone}</span>
+                  </td>
+                  <td>
+                    <div className="admin-order-items">
+                      <strong>{address.full_name || "Address not saved"}</strong>
+                      {address.phone && <span>{address.phone}</span>}
+                      {formatAddressLine(address) && <span>{formatAddressLine(address)}</span>}
+                      <em>
+                        Shipping: {formatChoiceLabel(order.shipping_method)}
+                        {order.shipping_amount ? ` (${currency.format(order.shipping_amount / 100)})` : ""}
+                      </em>
+                      <em>
+                        Armor: {order.has_insurance ? `Added (${currency.format((order.insurance_amount || 0) / 100)})` : "Not added"}
+                      </em>
+                      <em>
+                        Crafting: {formatChoiceLabel(order.crafting_speed)}
+                        {order.crafting_speed_fee ? ` (${currency.format(order.crafting_speed_fee / 100)})` : ""}
+                      </em>
+                      {address.delivery_notes && <span>Note: {address.delivery_notes}</span>}
+                    </div>
                   </td>
                   <td>
                     <div className="admin-order-items">
