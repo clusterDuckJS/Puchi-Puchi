@@ -319,6 +319,15 @@ button {
   box-shadow: 0 8px 30px -8px hsl(350 80% 75% / .12);
 }
 
+.route-loading {
+  display: grid;
+  min-height: 45vh;
+  place-items: center;
+  padding: 4rem 1rem;
+  color: #8d6b75;
+  font-weight: 800;
+}
+
 /* =========================================END----CARD----END========================================= */
 
 /* =================================ICONS================================= */

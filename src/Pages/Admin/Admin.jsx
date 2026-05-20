@@ -32,6 +32,7 @@ const currency = new Intl.NumberFormat("en-IN", {
 
 const USER_DISPLAY_ID_START = 1;
 const ORDER_DISPLAY_ID_START = 177;
+const PRODUCT_PLACEHOLDER_IMAGE = "/product-placeholder.svg";
 
 const adminNav = [
   { to: "/admin", label: "Overview", icon: LuLayoutDashboard, end: true },
@@ -87,6 +88,8 @@ const createBlankProductForm = () => ({
   is_featured: false,
   is_best_seller: false,
   is_new_arrival: false,
+  allow_custom_name: false,
+  allow_name_plate: false,
   variants: [createBlankVariant()],
 });
 
@@ -411,6 +414,7 @@ function OrdersPage() {
               image_url,
               base_text,
               base_fee,
+              custom_text_type,
               status,
               notes
             )
@@ -622,7 +626,7 @@ function OrdersPage() {
                             </span>
                             {customUpload?.base_text && (
                               <em>
-                                Base text: {customUpload.base_text}
+                                {customUpload.custom_text_type === "name_plate" ? "Name plate" : "Name"}: {customUpload.base_text}
                                 {customUpload.base_fee ? ` (+${currency.format(customUpload.base_fee / 100)})` : ""}
                               </em>
                             )}
@@ -1226,6 +1230,28 @@ function ProductFormModal({
           ))}
         </div>
 
+        <div className="admin-option-panel">
+          <div>
+            <h3>Name options</h3>
+            <p>Choose which personalization choices customers can add on the product page.</p>
+          </div>
+          <div className="admin-checkbox-grid">
+            {[
+              ["allow_name_plate", "Add name plate (+100)"],
+              ["allow_custom_name", "Add name (no extra cost)"],
+            ].map(([key, label]) => (
+              <label className="admin-check" key={key}>
+                <input
+                  type="checkbox"
+                  checked={form[key]}
+                  onChange={(event) => onProductChange(key, event.target.checked)}
+                />
+                <span>{label}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+
         <div className="admin-variant-header">
           <h3>Variants</h3>
           <button type="button" onClick={onAddVariant}>
@@ -1459,6 +1485,8 @@ function ProductsPage() {
       is_featured: product.is_featured ?? false,
       is_best_seller: product.is_best_seller ?? false,
       is_new_arrival: product.is_new_arrival ?? false,
+      allow_custom_name: product.allow_custom_name ?? false,
+      allow_name_plate: product.allow_name_plate ?? false,
       variants,
     });
     setEditingProduct(product);
@@ -1628,6 +1656,8 @@ function ProductsPage() {
       is_featured: form.is_featured,
       is_best_seller: form.is_best_seller,
       is_new_arrival: form.is_new_arrival,
+      allow_custom_name: form.allow_custom_name,
+      allow_name_plate: form.allow_name_plate,
     };
 
     const productRequest = editingProduct
@@ -1764,7 +1794,7 @@ function ProductsPage() {
             const variants = product.product_variants || [];
             const activeVariant = variants.find((variant) => variant.is_active) || variants[0];
             const price = activeVariant?.discount_price || activeVariant?.price || 0;
-            const image = parseListField(activeVariant?.image_urls || activeVariant?.image_url)[0] || "https://via.placeholder.com/600";
+            const image = parseListField(activeVariant?.image_urls || activeVariant?.image_url)[0] || PRODUCT_PLACEHOLDER_IMAGE;
             const categories = parseListField(product.categories || product.category);
 
             return (

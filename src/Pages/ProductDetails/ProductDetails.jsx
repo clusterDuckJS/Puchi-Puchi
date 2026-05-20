@@ -9,6 +9,7 @@ import { isTimeoutError, withRequestTimeout } from '../../utils/request'
 
 const CUSTOM_IMAGE_MAX_BYTES = 15 * 1024 * 1024
 const CUSTOM_BASE_TEXT_MAX_LENGTH = 40
+const PRODUCT_PLACEHOLDER_IMAGE = "/product-placeholder.svg"
 
 const parseListField = (value) => {
   if (Array.isArray(value)) return value.map(String).filter(Boolean)
@@ -33,7 +34,7 @@ function ProductDetails() {
   const [cartError, setCartError] = useState("")
   const [customImageFile, setCustomImageFile] = useState(null)
   const [customImagePreview, setCustomImagePreview] = useState("")
-  const [hasCustomBase, setHasCustomBase] = useState(false)
+  const [customNameOption, setCustomNameOption] = useState("none")
   const [customBaseText, setCustomBaseText] = useState("")
 
   useEffect(() => {
@@ -110,7 +111,7 @@ function ProductDetails() {
     setQuantity(1)
     setCustomImageFile(null)
     setCustomImagePreview("")
-    setHasCustomBase(false)
+    setCustomNameOption("none")
     setCustomBaseText("")
   }, [product])
 
@@ -187,13 +188,23 @@ function ProductDetails() {
     : variants
   const variant = variants.find((item) => item.id === selectedVariantId) || variants[0] || product.product_variants?.[0]
   const price = variant?.discount_price || variant?.price || 0
-  const customBaseFee = hasCustomBase ? CUSTOM_BASE_FEE : 0
+  const canAddName = product.allow_custom_name === true
+  const canAddNamePlate = product.allow_name_plate === true
+  const hasNameOptions = canAddName || canAddNamePlate
+  const selectedNameOption = customNameOption === "name_plate" && canAddNamePlate
+    ? "name_plate"
+    : customNameOption === "name" && canAddName
+      ? "name"
+      : "none"
+  const customBaseFee = selectedNameOption === "name_plate" ? CUSTOM_BASE_FEE : 0
   const displayPrice = price + customBaseFee
   const formattedPrice = formatCartPrice(displayPrice)
   const variantImages = parseListField(variant?.image_urls || variant?.image_url)
-  const image = variantImages[selectedImageIndex] || variantImages[0] || "https://via.placeholder.com/600"
+  const image = variantImages[selectedImageIndex] || variantImages[0] || PRODUCT_PLACEHOLDER_IMAGE
   const categories = parseListField(product.categories || product.category)
   const categoryLabel = categories.join(", ")
+  const stockCount = Number(variant?.stock ?? 0)
+  const hasStock = stockCount > 0
   const isMadeJustForYou = categories.some((category) => (
     category.toLowerCase().replace(/[^a-z0-9]/g, "").includes("madejustforyou")
   ))
@@ -219,8 +230,8 @@ function ProductDetails() {
       return
     }
 
-    if (isMadeJustForYou && hasCustomBase && !customBaseText.trim()) {
-      setCartError("Please enter the name or text for the custom base.")
+    if (selectedNameOption !== "none" && !customBaseText.trim()) {
+      setCartError("Please enter the name or text for this personalization.")
       return
     }
 
@@ -245,8 +256,9 @@ function ProductDetails() {
         quantity,
         price,
         customImageUrl,
-        customBaseText: hasCustomBase ? customBaseText : "",
+        customBaseText: selectedNameOption !== "none" ? customBaseText : "",
         customBaseFee,
+        customTextType: selectedNameOption === "name_plate" ? "name_plate" : "name",
       })
 
       setCartMessage("Added to cart.")
@@ -349,6 +361,12 @@ function ProductDetails() {
             <h1>{product.name}</h1>
             <h3>{formattedPrice}</h3>
 
+            {variant?.id && (
+              <p className={`product-stock ${hasStock ? "" : "out"}`}>
+                {hasStock ? `${stockCount} ${stockCount === 1 ? "item" : "items"} left in stock` : "Out of stock"}
+              </p>
+            )}
+
             <p className="product-description">
               {product.description || "No description available"}
             </p>
@@ -402,73 +420,119 @@ function ProductDetails() {
               </div>
             )}
 
-            <div className="detail-card">
+            {/* <div className="detail-card">
               <h6>Details</h6>
               <ul>
                 {details.map((detail) => (
                   <li key={detail}>{detail}</li>
                 ))}
               </ul>
-            </div>
+            </div> */}
 
-            {isMadeJustForYou && (
+            {(isMadeJustForYou || hasNameOptions) && (
               <div className="custom-upload-card">
-                <div>
-                  <h6>Reference Image</h6>
-                  <p>Upload one image under 15MB before adding this custom product to cart.</p>
-                </div>
-
-                {customImagePreview ? (
-                  <div className="custom-upload-preview">
-                    <img src={customImagePreview} alt="Uploaded reference preview" />
+                {isMadeJustForYou && (
+                  <>
                     <div>
-                      <strong>{customImageFile?.name}</strong>
-                      <span>{((customImageFile?.size || 0) / (1024 * 1024)).toFixed(2)} MB</span>
+                      <h6>Reference Image</h6>
+                      <p>Upload one image under 15MB before adding this custom product to cart.</p>
                     </div>
-                    <button type="button" onClick={clearCustomImage} aria-label="Remove uploaded image">
-                      <LuX />
-                    </button>
-                  </div>
-                ) : (
-                  <label className="custom-upload-dropzone" htmlFor="customReferenceImage">
-                    <LuImagePlus />
-                    <span>Choose Image</span>
-                    <small>PNG, JPG, WEBP, or HEIC up to 15MB</small>
-                  </label>
+
+                    {customImagePreview ? (
+                      <div className="custom-upload-preview">
+                        <img src={customImagePreview} alt="Uploaded reference preview" />
+                        <div>
+                          <strong>{customImageFile?.name}</strong>
+                          <span>{((customImageFile?.size || 0) / (1024 * 1024)).toFixed(2)} MB</span>
+                        </div>
+                        <button type="button" onClick={clearCustomImage} aria-label="Remove uploaded image">
+                          <LuX />
+                        </button>
+                      </div>
+                    ) : (
+                      <label className="custom-upload-dropzone" htmlFor="customReferenceImage">
+                        <LuImagePlus />
+                        <span>Choose Image</span>
+                        <small>PNG, JPG, WEBP, or HEIC up to 15MB</small>
+                      </label>
+                    )}
+
+                    <input
+                      id="customReferenceImage"
+                      ref={customImageInputRef}
+                      className="custom-upload-input"
+                      type="file"
+                      accept="image/*"
+                      onChange={handleCustomImageChange}
+                    />
+                  </>
                 )}
 
-                <input
-                  id="customReferenceImage"
-                  ref={customImageInputRef}
-                  className="custom-upload-input"
-                  type="file"
-                  accept="image/*"
-                  onChange={handleCustomImageChange}
-                />
+                {hasNameOptions && (
+                  <div className="custom-name-options">
+                    <h6>Personalization</h6>
 
-                <label className={`custom-base-option ${hasCustomBase ? "selected" : ""}`}>
-                  <input
-                    type="checkbox"
-                    checked={hasCustomBase}
-                    onChange={(event) => {
-                      setHasCustomBase(event.target.checked)
-                      setCartMessage("")
-                      setCartError("")
+                    {canAddNamePlate && (
+                      <label className={`custom-base-option ${selectedNameOption === "name_plate" ? "selected" : ""}`}>
+                        <input
+                          type="radio"
+                          name="customNameOption"
+                          checked={selectedNameOption === "name_plate"}
+                          onChange={() => {
+                            setCustomNameOption("name_plate")
+                            setCartMessage("")
+                            setCartError("")
+                          }}
+                        />
+                        <span>
+                          <strong>Add name plate</strong>
+                          <small>+{formatCartPrice(CUSTOM_BASE_FEE)}</small>
+                        </span>
+                      </label>
+                    )}
 
-                      if (!event.target.checked) {
-                        setCustomBaseText("")
-                      }
-                    }}
-                  />
-                  <span>
-                    <strong>Add base with custom name/text</strong>
-                    <small>+{formatCartPrice(CUSTOM_BASE_FEE)}</small>
-                  </span>
-                </label>
+                    {canAddName && (
+                      <label className={`custom-base-option ${selectedNameOption === "name" ? "selected" : ""}`}>
+                        <input
+                          type="radio"
+                          name="customNameOption"
+                          checked={selectedNameOption === "name"}
+                          onChange={() => {
+                            setCustomNameOption("name")
+                            setCartMessage("")
+                            setCartError("")
+                          }}
+                        />
+                        <span>
+                          <strong>Add name</strong>
+                          <small>No extra cost</small>
+                        </span>
+                      </label>
+                    )}
 
-                {hasCustomBase && (
+                    <label className={`custom-base-option ${selectedNameOption === "none" ? "selected" : ""}`}>
+                      <input
+                        type="radio"
+                        name="customNameOption"
+                        checked={selectedNameOption === "none"}
+                        onChange={() => {
+                          setCustomNameOption("none")
+                          setCustomBaseText("")
+                          setCartMessage("")
+                          setCartError("")
+                        }}
+                      />
+                      <span>
+                        <strong>No name</strong>
+                        <small>Keep it simple</small>
+                      </span>
+                    </label>
+                  </div>
+                )}
+
+                {selectedNameOption !== "none" && (
                   <label className="custom-base-text" htmlFor="customBaseText">
-                    <span>Base text</span>
+                    <span>{selectedNameOption === "name_plate" ? "Name plate text" : "Name"}</span>
                     <input
                       id="customBaseText"
                       type="text"

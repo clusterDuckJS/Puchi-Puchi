@@ -4,6 +4,84 @@
     background: #fff5f8;
 }
 
+.damage-guarantee-banner {
+    position: relative;
+    overflow: hidden;
+    padding: 0.55rem 0;
+    border-block: 1px solid #f3e2e5;
+    background: #4f313b;
+    color: #fff8f4;
+}
+
+.damage-guarantee-banner::before,
+.damage-guarantee-banner::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    z-index: 1;
+    width: min(12vw, 6rem);
+    pointer-events: none;
+}
+
+.damage-guarantee-banner::before {
+    left: 0;
+    background: linear-gradient(90deg, #4f313b, rgb(79 49 59 / 0%));
+}
+
+.damage-guarantee-banner::after {
+    right: 0;
+    background: linear-gradient(270deg, #4f313b, rgb(79 49 59 / 0%));
+}
+
+.damage-guarantee-track {
+    display: flex;
+    width: max-content;
+    animation: damage-guarantee-marquee 28s linear infinite;
+}
+
+.damage-guarantee-track span {
+    display: inline-flex;
+    align-items: center;
+    flex: 0 0 auto;
+    padding-inline: 2rem;
+    font-size: 0.92rem;
+    font-weight: 700;
+    letter-spacing: 0;
+    white-space: nowrap;
+}
+
+.damage-guarantee-track span::after {
+    content: "";
+    width: 0.35rem;
+    height: 0.35rem;
+    margin-left: 2rem;
+    border-radius: 999px;
+    background: #ffb6ca;
+}
+
+.damage-guarantee-track a {
+    color: #ffd5df;
+    font-weight: 900;
+    text-decoration: underline;
+    text-decoration-thickness: 2px;
+    text-underline-offset: 0.18rem;
+}
+
+.damage-guarantee-track a:hover {
+    color: white;
+}
+
+@keyframes damage-guarantee-marquee {
+    from {
+        transform: translateX(0);
+    }
+
+    to {
+        transform: translateX(-50%);
+    }
+}
+
 .home-section > .tag {
     padding: 0.42rem 1.05rem;
     background: #fde7ef;
@@ -181,5 +259,27 @@
         align-items: flex-start;
         flex-direction: column;
         gap: 0.9rem;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .damage-guarantee-track {
+        animation: none;
+        justify-content: center;
+        width: 100%;
+    }
+
+    .damage-guarantee-track span:not(:first-child) {
+        display: none;
+    }
+
+    .damage-guarantee-track span {
+        padding-inline: 1rem;
+        text-align: center;
+        white-space: normal;
+    }
+
+    .damage-guarantee-track span::after {
+        display: none;
     }
 }

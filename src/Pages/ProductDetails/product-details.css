@@ -105,10 +105,29 @@
     font-weight: 800;
 }
 
+.product-stock {
+    width: fit-content;
+    margin-top: -0.45rem;
+    padding: 0.38rem 0.85rem;
+    border: 1px solid rgb(22 163 74 / 20%);
+    border-radius: 999px;
+    background: rgb(22 163 74 / 8%);
+    color: var(--color-success);
+    font-size: 0.88rem;
+    font-weight: 800;
+}
+
+.product-stock.out {
+    border-color: rgb(255 65 65 / 18%);
+    background: rgb(255 65 65 / 8%);
+    color: var(--color-error);
+}
+
 .product-description {
     color: #9a6577;
     font-size: 0.98rem;
     line-height: 1.65;
+    white-space: pre-line;
 }
 
 .variant-picker {
@@ -275,6 +294,11 @@
     margin-top: 0.2rem;
     color: #9a6577;
     font-size: 0.9rem;
+}
+
+.custom-name-options {
+    display: grid;
+    gap: 0.65rem;
 }
 
 .custom-upload-dropzone {

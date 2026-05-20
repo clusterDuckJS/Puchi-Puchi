@@ -35,6 +35,7 @@ const SHIPPING_OPTIONS = {
 }
 
 const INSURANCE_AMOUNT = 10000
+const PRODUCT_PLACEHOLDER_IMAGE = "/product-placeholder.svg"
 const PRIORITY_CRAFTING_MULTIPLIER = 0.5
 const FREE_STANDARD_SHIPPING_THRESHOLD = 100000
 
@@ -282,7 +283,7 @@ function Cart() {
                     const product = item.products || {}
                     const variant = item.product_variants || {}
                     const customUpload = item.custom_uploads?.[0]
-                    const image = parseCartListField(variant.image_urls || variant.image_url)[0] || "https://via.placeholder.com/160"
+                    const image = parseCartListField(variant.image_urls || variant.image_url)[0] || PRODUCT_PLACEHOLDER_IMAGE
                     const quantity = item.quantity || 1
                     const isBusy = busyItemId === item.id
 
@@ -305,7 +306,7 @@ function Cart() {
                           )}
                           {customUpload?.base_text && (
                             <span className="cart-custom-base">
-                              Base text: {customUpload.base_text}
+                              {customUpload.custom_text_type === "name_plate" ? "Name plate" : "Name"}: {customUpload.base_text}
                               {customUpload.base_fee ? ` (+${formatCartPrice(customUpload.base_fee)})` : ""}
                             </span>
                           )}

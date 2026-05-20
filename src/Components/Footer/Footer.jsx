@@ -1,7 +1,8 @@
-import { FaInstagram, FaReddit, FaTwitter } from "react-icons/fa";
+import { FaInstagram, FaTwitter } from "react-icons/fa";
 import { Link } from "react-router-dom";
 import LOGO from "../../assets/puchi_logo_tran.svg";
 import "./footer.css";
+import { FaReddit, FaWhatsapp } from "react-icons/fa6";
 
 function Footer() {
   return (
@@ -17,6 +18,9 @@ function Footer() {
             </a>
             <a href="https://www.reddit.com/user/Landlord04001/" aria-label="Reddit">
               <FaReddit />
+            </a>
+             <a href="https://wa.me/917907969115" aria-label="Whatsapp">
+              <FaWhatsapp />
             </a>
           </div>
         </div>

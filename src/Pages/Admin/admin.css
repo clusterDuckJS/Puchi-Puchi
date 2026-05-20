@@ -801,6 +801,27 @@
   gap: 0.75rem;
 }
 
+.admin-option-panel {
+  display: grid;
+  gap: 0.85rem;
+  padding: 1rem;
+  border: 1px solid rgb(221 95 137 / 14%);
+  border-radius: 18px;
+  background: rgb(255 245 248 / 52%);
+}
+
+.admin-option-panel h3 {
+  color: #352026;
+  font-size: 1rem;
+  font-weight: 800;
+}
+
+.admin-option-panel p {
+  margin-top: 0.2rem;
+  color: rgb(83 45 51 / 62%);
+  font-size: 0.88rem;
+}
+
 .admin-check {
   display: inline-flex;
   align-items: center;

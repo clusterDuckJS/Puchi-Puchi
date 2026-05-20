@@ -95,6 +95,7 @@ export const addItemToCart = async ({
   customImageUrl,
   customBaseText = "",
   customBaseFee = 0,
+  customTextType = null,
 }) => {
   if (!userId) {
     throw new Error("Please log in before adding items to your cart.")
@@ -109,11 +110,12 @@ export const addItemToCart = async ({
   const hasCustomUpload = Boolean(customImageUrl)
   const normalizedBaseText = customBaseText.trim().slice(0, 40)
   const baseFee = normalizedBaseText ? Number(customBaseFee) || 0 : 0
+  const normalizedTextType = normalizedBaseText && customTextType === "name_plate" ? "name_plate" : (normalizedBaseText ? "name" : null)
   const itemPrice = price + baseFee
 
   let cartItem = null
 
-  if (!hasCustomUpload) {
+  if (!hasCustomUpload && !normalizedBaseText) {
     const { data: existingItem, error: itemError } = await supabase
       .from("order_items")
       .select("id, quantity")
@@ -160,14 +162,15 @@ export const addItemToCart = async ({
     cartItem = data
   }
 
-  if (hasCustomUpload) {
+  if (hasCustomUpload || normalizedBaseText) {
     const { error } = await supabase
       .from("custom_uploads")
       .insert({
         order_item_id: cartItem.id,
-        image_url: customImageUrl,
+        image_url: customImageUrl || null,
         base_text: normalizedBaseText || null,
         base_fee: baseFee,
+        custom_text_type: normalizedTextType,
         status: "pending",
       })
 
@@ -270,6 +273,7 @@ export const fetchCart = async (userId) => {
         image_url,
         base_text,
         base_fee,
+        custom_text_type,
         status,
         notes
       )

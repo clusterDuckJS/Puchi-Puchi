@@ -1,12 +1,13 @@
-import { useEffect, useRef, useState } from "react";
+import { Suspense, lazy, useEffect, useRef, useState } from "react";
 import { LuLogOut, LuMenu, LuSearch, LuShoppingBag, LuUser, LuX } from "react-icons/lu";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import LOGO from "../../assets/puchi_logo_tran.svg";
 import { CART_UPDATED_EVENT, getCartItemCount } from "../../utils/cart";
 import { supabase } from "../../utils/supabase";
-import AuthForm from "../Auth/AuthForm";
-import AuthModal from "../Auth/AuthModal";
 import "./header.css";
+
+const AuthForm = lazy(() => import("../Auth/AuthForm"));
+const AuthModal = lazy(() => import("../Auth/AuthModal"));
 
 function Header({ profile, user }) {
   const navigate = useNavigate();
@@ -203,6 +204,9 @@ function Header({ profile, user }) {
             <NavLink to="/reviews" className="nav-link" onClick={closeMobileMenu}>
               Reviews
             </NavLink>
+            <NavLink to="/faq" className="nav-link" onClick={closeMobileMenu}>
+              FAQ
+            </NavLink>
           </nav>
 
           <div className="header-account">
@@ -286,9 +290,13 @@ function Header({ profile, user }) {
         </div>
       </header>
 
-      <AuthModal isOpen={openAuth} onClose={() => setOpenAuth(false)}>
-        <AuthForm initialMode={authMode} onAuthSuccess={() => setOpenAuth(false)} />
-      </AuthModal>
+      {openAuth && (
+        <Suspense fallback={null}>
+          <AuthModal isOpen={openAuth} onClose={() => setOpenAuth(false)}>
+            <AuthForm initialMode={authMode} onAuthSuccess={() => setOpenAuth(false)} />
+          </AuthModal>
+        </Suspense>
+      )}
     </>
   );
 }

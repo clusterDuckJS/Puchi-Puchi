@@ -30,6 +30,8 @@ import { isTimeoutError, withRequestTimeout } from "../../utils/request";
 import { supabase } from "../../utils/supabase";
 import "./profile.css";
 
+const PRODUCT_PLACEHOLDER_IMAGE = "/product-placeholder.svg";
+
 const ORDER_STEPS = [
   { ...ORDER_STAGE_OPTIONS[0], icon: LuCircleCheck },
   { ...ORDER_STAGE_OPTIONS[1], icon: LuWandSparkles },
@@ -149,7 +151,7 @@ function OrdersTab({ orders, loading, error }) {
               const product = item.products || {};
               const variant = item.product_variants || {};
               const customUpload = item.custom_uploads?.[0];
-              const image = parseCartListField(variant.image_urls || variant.image_url)[0] || "https://via.placeholder.com/160";
+              const image = parseCartListField(variant.image_urls || variant.image_url)[0] || PRODUCT_PLACEHOLDER_IMAGE;
               const itemTotal = (item.quantity || 0) * (item.price || 0);
 
               return (
@@ -169,7 +171,7 @@ function OrdersTab({ orders, loading, error }) {
                       )}
                       {customUpload?.base_text && (
                         <small>
-                          Base text: {customUpload.base_text}
+                          {customUpload.custom_text_type === "name_plate" ? "Name plate" : "Name"}: {customUpload.base_text}
                           {customUpload.base_fee ? ` (+${formatCartPrice(customUpload.base_fee)})` : ""}
                         </small>
                       )}
@@ -462,6 +464,7 @@ function Profile({ user, profile, onProfileUpdated }) {
               image_url,
               base_text,
               base_fee,
+              custom_text_type,
               status,
               notes
             )

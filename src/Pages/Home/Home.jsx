@@ -6,7 +6,7 @@ import { LuArrowRight, LuBox, LuCamera, LuCheck, LuWandSparkles } from 'react-ic
 import ProductCard from '../../Components/ProductCard/ProductCard'
 import { supabase } from '../../utils/supabase.js'
 import { withRequestTimeout } from '../../utils/request.js'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 
 function Home() {
   const navigate = useNavigate()
@@ -66,6 +66,17 @@ function Home() {
   return (
     <div className='container home'>
       <Hero />
+
+      <div className="damage-guarantee-banner" aria-label="Transit damage replacement guarantee">
+        <div className="damage-guarantee-track">
+          {Array.from({ length: 4 }).map((_, index) => (
+            <span key={index}>
+              We pack with love, but accidents happen. Enjoy our 100% replacement guarantee for transit damage. (
+              <Link to="/faq#returns">T&Cs apply</Link>)
+            </span>
+          ))}
+        </div>
+      </div>
 
       <Section
         id="custom-chibi"

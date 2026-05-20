@@ -1,6 +1,8 @@
 import './product-card.css'
 import { NavLink } from 'react-router-dom'
 
+const PRODUCT_PLACEHOLDER_IMAGE = "/product-placeholder.svg"
+
 const parseListField = (value) => {
   if (Array.isArray(value)) return value.filter(Boolean)
   if (!value) return []
@@ -34,7 +36,7 @@ function ProductCard({ product, onClick }) {
     parseListField(variants[0]?.image_urls)[0] ||
     variants[0]?.image_url ||
     product.image_url ||
-    "https://via.placeholder.com/300"
+    PRODUCT_PLACEHOLDER_IMAGE
 
   return (
     <div onClick={() => onClick(product)} className="product-card card pointer">
