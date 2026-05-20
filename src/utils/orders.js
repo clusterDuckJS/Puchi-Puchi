@@ -49,6 +49,17 @@ export const formatOrderNumber = (order) => {
   return String(order?.id || "").slice(0, 8).toUpperCase();
 };
 
+export const isMissingOrderNumberError = (error) => {
+  const errorText = [
+    error?.code,
+    error?.message,
+    error?.details,
+    error?.hint,
+  ].filter(Boolean).join(" ").toLowerCase();
+
+  return errorText.includes("order_number");
+};
+
 const isWorkingDay = (date) => {
   const day = date.getDay();
   return day !== 0 && day !== 6;

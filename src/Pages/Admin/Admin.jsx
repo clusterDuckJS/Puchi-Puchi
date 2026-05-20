@@ -19,7 +19,14 @@ import {
   LuX,
 } from "react-icons/lu";
 import { NavLink, Route, Routes, useNavigate } from "react-router-dom";
-import { formatOrderNumber, formatOrderStatus, formatShortDate, getCountdownLabel, ORDER_STAGE_OPTIONS } from "../../utils/orders";
+import {
+  formatOrderNumber,
+  formatOrderStatus,
+  formatShortDate,
+  getCountdownLabel,
+  isMissingOrderNumberError,
+  ORDER_STAGE_OPTIONS,
+} from "../../utils/orders";
 import { supabase } from "../../utils/supabase";
 import { isTimeoutError, withRequestTimeout } from "../../utils/request";
 import "./admin.css";
@@ -174,36 +181,38 @@ function OverviewPage() {
     setError("");
 
     try {
+      const createOrdersRequest = (includeOrderNumber) => withRequestTimeout(supabase
+        .from("orders")
+        .select(`
+          id,
+          user_id,
+          ${includeOrderNumber ? "order_number," : ""}
+          total_amount,
+          status,
+          paid_at,
+          tracking_id,
+          dispatched_at,
+          customer_name,
+          customer_email,
+          customer_phone,
+          created_at,
+          order_items (
+            quantity,
+            products (
+              id,
+              name
+            )
+          )
+        `)
+        .neq("status", "pending")
+        .order("created_at", { ascending: false }));
+
       const [
         ordersResult,
         productsResult,
         profilesResult,
       ] = await Promise.all([
-        withRequestTimeout(supabase
-          .from("orders")
-          .select(`
-            id,
-            user_id,
-            order_number,
-            total_amount,
-            status,
-            paid_at,
-            tracking_id,
-            dispatched_at,
-            customer_name,
-            customer_email,
-            customer_phone,
-            created_at,
-            order_items (
-              quantity,
-              products (
-                id,
-                name
-              )
-            )
-          `)
-          .neq("status", "pending")
-          .order("created_at", { ascending: false })),
+        createOrdersRequest(true),
         withRequestTimeout(supabase
           .from("products")
           .select("id", { count: "exact", head: true })
@@ -213,11 +222,15 @@ function OverviewPage() {
           .select("id, first_name, last_name, email", { count: "exact" })),
       ]);
 
-      if (ordersResult.error) throw ordersResult.error;
+      const safeOrdersResult = ordersResult.error && isMissingOrderNumberError(ordersResult.error)
+        ? await createOrdersRequest(false)
+        : ordersResult;
+
+      if (safeOrdersResult.error) throw safeOrdersResult.error;
       if (productsResult.error) throw productsResult.error;
       if (profilesResult.error) throw profilesResult.error;
 
-      const orders = ordersResult.data || [];
+      const orders = safeOrdersResult.data || [];
       const profiles = profilesResult.data || [];
       const todayStart = new Date();
       todayStart.setHours(0, 0, 0, 0);
@@ -380,13 +393,13 @@ function OrdersPage() {
     setError("");
 
     try {
-      const { data, error: ordersError } = await withRequestTimeout(supabase
+      const createOrdersRequest = (includeOrderNumber) => supabase
         .from("orders")
         .select(`
           id,
-            user_id,
-            order_number,
-            total_amount,
+          user_id,
+          ${includeOrderNumber ? "order_number," : ""}
+          total_amount,
           status,
           paid_at,
           tracking_id,
@@ -422,7 +435,15 @@ function OrdersPage() {
           )
         `)
         .neq("status", "pending")
-        .order("created_at", { ascending: false }));
+        .order("created_at", { ascending: false });
+
+      let ordersResult = await withRequestTimeout(createOrdersRequest(true));
+
+      if (ordersResult.error && isMissingOrderNumberError(ordersResult.error)) {
+        ordersResult = await withRequestTimeout(createOrdersRequest(false));
+      }
+
+      const { data, error: ordersError } = ordersResult;
 
       if (ordersError) throw ordersError;
 

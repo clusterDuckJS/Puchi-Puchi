@@ -25,6 +25,7 @@ import {
   formatShortDate,
   getCountdownLabel,
   getOrderStageIndex,
+  isMissingOrderNumberError,
   ORDER_STAGE_OPTIONS,
 } from "../../utils/orders";
 import { isTimeoutError, withRequestTimeout } from "../../utils/request";
@@ -440,11 +441,11 @@ function Profile({ user, profile, onProfileUpdated }) {
     setOrdersError("");
 
     try {
-      const { data, error } = await withRequestTimeout(supabase
+      const createOrdersRequest = (includeOrderNumber) => supabase
         .from("orders")
         .select(`
           id,
-          order_number,
+          ${includeOrderNumber ? "order_number," : ""}
           total_amount,
           status,
           paid_at,
@@ -474,7 +475,15 @@ function Profile({ user, profile, onProfileUpdated }) {
         `)
         .eq("user_id", user.id)
         .neq("status", "pending")
-        .order("created_at", { ascending: false }));
+        .order("created_at", { ascending: false });
+
+      let ordersResult = await withRequestTimeout(createOrdersRequest(true));
+
+      if (ordersResult.error && isMissingOrderNumberError(ordersResult.error)) {
+        ordersResult = await withRequestTimeout(createOrdersRequest(false));
+      }
+
+      const { data, error } = ordersResult;
 
       if (error) throw error;
 
