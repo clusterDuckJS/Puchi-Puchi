@@ -545,6 +545,11 @@ function Cart() {
               >
                 {isCheckingOut ? "Opening Checkout..." : "Proceed to Checkout"}
               </button>
+              {!addressesLoading && !addressesError && addresses.length === 0 && (
+                <p className="cart-checkout-address-message">
+                  Add a delivery address before you proceed to checkout.
+                </p>
+              )}
               <p>Secure checkout | India-wide shipping</p>
             </aside>
           </div>

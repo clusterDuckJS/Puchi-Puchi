@@ -517,6 +517,14 @@
     box-shadow: 0 14px 28px rgb(221 95 137 / 18%);
 }
 
+.cart-checkout-address-message {
+    margin: -0.25rem 0 0;
+    color: #c74768;
+    font-size: 0.82rem;
+    font-weight: 800;
+    text-align: center;
+}
+
 .cart-summary > p {
     max-width: none;
     color: #9a6577;

@@ -1461,8 +1461,9 @@ function ProductsPage() {
   };
 
   const openEditModal = (product) => {
-    const variants = product.product_variants?.length
-      ? product.product_variants.map((variant) => ({
+    const activeVariants = (product.product_variants || []).filter((variant) => variant.is_active !== false);
+    const variants = activeVariants.length
+      ? activeVariants.map((variant) => ({
         id: variant.id,
         name: variant.name || "",
         price: centsToRupees(variant.price),
@@ -1694,6 +1695,7 @@ function ProductsPage() {
         const { error: removeError } = await supabase
           .from("product_variants")
           .update({ is_active: false })
+          .eq("product_id", savedProduct.id)
           .in("id", removedVariantIds);
 
         if (removeError) {
@@ -1706,20 +1708,36 @@ function ProductsPage() {
 
     for (const variant of variants) {
       const { id, ...variantPayload } = variant;
-      const variantRequest = id
-        ? supabase
+      if (id) {
+        const { data: updatedVariant, error: variantError } = await supabase
           .from("product_variants")
           .update(variantPayload)
           .eq("id", id)
           .eq("product_id", savedProduct.id)
-        : supabase
+          .select("id")
+          .maybeSingle();
+
+        if (variantError) {
+          setFormError(variantError.message);
+          setSaving(false);
+          return;
+        }
+
+        if (!updatedVariant) {
+          setFormError("One variant could not be updated. Please refresh and try again.");
+          setSaving(false);
+          return;
+        }
+
+        continue;
+      }
+
+      const { error: variantError } = await supabase
           .from("product_variants")
           .insert({
             ...variantPayload,
             product_id: savedProduct.id,
           });
-
-      const { error: variantError } = await variantRequest;
 
       if (variantError) {
         setFormError(variantError.message);
@@ -1791,8 +1809,8 @@ function ProductsPage() {
       {!loading && !error && filteredProducts.length > 0 && (
         <div className="admin-products-grid">
           {filteredProducts.map((product) => {
-            const variants = product.product_variants || [];
-            const activeVariant = variants.find((variant) => variant.is_active) || variants[0];
+            const variants = (product.product_variants || []).filter((variant) => variant.is_active !== false);
+            const activeVariant = variants[0];
             const price = activeVariant?.discount_price || activeVariant?.price || 0;
             const image = parseListField(activeVariant?.image_urls || activeVariant?.image_url)[0] || PRODUCT_PLACEHOLDER_IMAGE;
             const categories = parseListField(product.categories || product.category);
