@@ -70,6 +70,10 @@ serve(async (request) => {
       .from("orders")
       .update({ status: "paid", paid_at: new Date().toISOString() })
       .eq("id", supabaseOrderId)
+
+    await serviceClient.rpc("assign_order_number", {
+      target_order_id: supabaseOrderId,
+    })
   }
 
   return jsonResponse({

@@ -19,7 +19,7 @@ import {
   LuX,
 } from "react-icons/lu";
 import { NavLink, Route, Routes, useNavigate } from "react-router-dom";
-import { formatOrderStatus, formatShortDate, getCountdownLabel, ORDER_STAGE_OPTIONS } from "../../utils/orders";
+import { formatOrderNumber, formatOrderStatus, formatShortDate, getCountdownLabel, ORDER_STAGE_OPTIONS } from "../../utils/orders";
 import { supabase } from "../../utils/supabase";
 import { isTimeoutError, withRequestTimeout } from "../../utils/request";
 import "./admin.css";
@@ -31,7 +31,6 @@ const currency = new Intl.NumberFormat("en-IN", {
 });
 
 const USER_DISPLAY_ID_START = 1;
-const ORDER_DISPLAY_ID_START = 177;
 const PRODUCT_PLACEHOLDER_IMAGE = "/product-placeholder.svg";
 
 const adminNav = [
@@ -185,6 +184,7 @@ function OverviewPage() {
           .select(`
             id,
             user_id,
+            order_number,
             total_amount,
             status,
             paid_at,
@@ -217,7 +217,7 @@ function OverviewPage() {
       if (productsResult.error) throw productsResult.error;
       if (profilesResult.error) throw profilesResult.error;
 
-      const orders = withSequentialDisplayIds(ordersResult.data || [], ORDER_DISPLAY_ID_START);
+      const orders = ordersResult.data || [];
       const profiles = profilesResult.data || [];
       const todayStart = new Date();
       todayStart.setHours(0, 0, 0, 0);
@@ -347,7 +347,7 @@ function OverviewPage() {
                 return (
               <div className="admin-order-row" key={order.id}>
                 <div>
-                  <p>#{order.display_id}</p>
+                  <p>#{formatOrderNumber(order)}</p>
                   <span>{customer}</span>
                 </div>
                 <strong>{currency.format((order.total_amount || 0) / 100)}</strong>
@@ -384,8 +384,9 @@ function OrdersPage() {
         .from("orders")
         .select(`
           id,
-          user_id,
-          total_amount,
+            user_id,
+            order_number,
+            total_amount,
           status,
           paid_at,
           tracking_id,
@@ -425,7 +426,7 @@ function OrdersPage() {
 
       if (ordersError) throw ordersError;
 
-      const fetchedOrders = withSequentialDisplayIds(data || [], ORDER_DISPLAY_ID_START);
+      const fetchedOrders = data || [];
       setOrderRows(fetchedOrders);
 
       const userIds = [...new Set(fetchedOrders.map((order) => order.user_id).filter(Boolean))];
@@ -553,7 +554,7 @@ function OrdersPage() {
 
       return [
         order.id,
-        order.display_id,
+        formatOrderNumber(order),
         customer.name,
         customer.email,
         customer.phone,
@@ -604,7 +605,7 @@ function OrdersPage() {
 
               return (
                 <tr key={order.id}>
-                  <td>#{order.display_id}</td>
+                  <td>#{formatOrderNumber(order)}</td>
                   <td className="admin-customer-cell">
                     <p>{customer.name}</p>
                     <span>{customer.email}</span>

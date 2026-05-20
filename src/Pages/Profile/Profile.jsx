@@ -21,6 +21,7 @@ import { NavLink, useNavigate } from "react-router-dom";
 import { formatCartPrice, parseCartListField } from "../../utils/cart";
 import {
   formatOrderStatus,
+  formatOrderNumber,
   formatShortDate,
   getCountdownLabel,
   getOrderStageIndex,
@@ -135,7 +136,7 @@ function OrdersTab({ orders, loading, error }) {
         <article className="profile-order-card" key={order.id}>
           <header className="profile-order-header">
             <div>
-              <strong>#{order.id.slice(0, 8).toUpperCase()}</strong>
+              <strong>#{formatOrderNumber(order)}</strong>
               <span>{formatShortDate(order.paid_at || order.created_at) || "Recently"}</span>
             </div>
             <em>{formatOrderStatus(order.status)}</em>
@@ -443,6 +444,7 @@ function Profile({ user, profile, onProfileUpdated }) {
         .from("orders")
         .select(`
           id,
+          order_number,
           total_amount,
           status,
           paid_at,

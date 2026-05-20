@@ -41,6 +41,14 @@ export const formatOrderStatus = (status) => {
     .replace(/\b\w/g, (letter) => letter.toUpperCase());
 };
 
+export const formatOrderNumber = (order) => {
+  if (order?.order_number) {
+    return String(order.order_number).padStart(4, "0");
+  }
+
+  return String(order?.id || "").slice(0, 8).toUpperCase();
+};
+
 const isWorkingDay = (date) => {
   const day = date.getDay();
   return day !== 0 && day !== 6;
