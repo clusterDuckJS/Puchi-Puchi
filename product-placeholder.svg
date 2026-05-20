@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 600" role="img" aria-labelledby="title desc">
+  <title id="title">Puchi Puchi product placeholder</title>
+  <desc id="desc">A soft pink placeholder image for products without a photo.</desc>
+  <rect width="600" height="600" fill="#fff5f8"/>
+  <circle cx="300" cy="274" r="116" fill="#fde7ef"/>
+  <circle cx="259" cy="252" r="14" fill="#4f313b"/>
+  <circle cx="341" cy="252" r="14" fill="#4f313b"/>
+  <path d="M258 314c27 26 57 26 84 0" fill="none" stroke="#dd5f89" stroke-width="18" stroke-linecap="round"/>
+  <path d="M177 430c35-55 82-82 123-82s88 27 123 82" fill="#fffcfa"/>
+  <path d="M177 430c35-55 82-82 123-82s88 27 123 82" fill="none" stroke="#f3bfd0" stroke-width="12" stroke-linecap="round"/>
+  <text x="300" y="500" fill="#8d6b75" font-family="Nunito, Arial, sans-serif" font-size="32" font-weight="800" text-anchor="middle">Puchi Puchi</text>
+</svg>
