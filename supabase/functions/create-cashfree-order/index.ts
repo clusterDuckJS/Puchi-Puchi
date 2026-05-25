@@ -121,11 +121,61 @@ serve(async (request) => {
 
   const { data: items, error: itemsError } = await serviceClient
     .from("order_items")
-    .select("quantity, price")
+    .select(`
+      quantity,
+      price,
+      variant_id,
+      products (
+        name
+      ),
+      product_variants (
+        name,
+        stock,
+        is_active
+      )
+    `)
     .eq("order_id", order.id)
 
   if (itemsError) {
     return jsonResponse({ error: "We could not read your cart items." }, 500)
+  }
+
+  const variantQuantities = new Map<string, {
+    quantity: number
+    stock: number
+    isActive: boolean
+    name: string
+  }>()
+
+  for (const item of items || []) {
+    if (!item.variant_id) continue
+
+    const variant = Array.isArray(item.product_variants)
+      ? item.product_variants[0]
+      : item.product_variants
+    const product = Array.isArray(item.products)
+      ? item.products[0]
+      : item.products
+    const current = variantQuantities.get(item.variant_id)
+
+    variantQuantities.set(item.variant_id, {
+      quantity: (current?.quantity || 0) + (Number(item.quantity) || 0),
+      stock: Math.max(0, Number(variant?.stock) || 0),
+      isActive: variant?.is_active !== false,
+      name: [product?.name, variant?.name].filter(Boolean).join(" - ") || "This item",
+    })
+  }
+
+  for (const item of variantQuantities.values()) {
+    if (!item.isActive || item.stock <= 0) {
+      return jsonResponse({ error: `${item.name} is out of stock.` }, 400)
+    }
+
+    if (item.quantity > item.stock) {
+      return jsonResponse({
+        error: `${item.name} only has ${item.stock} ${item.stock === 1 ? "item" : "items"} left.`,
+      }, 400)
+    }
   }
 
   const subtotal = (items || []).reduce(

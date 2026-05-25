@@ -205,16 +205,10 @@ function ProductDetails() {
   const categoryLabel = categories.join(", ")
   const stockCount = Number(variant?.stock ?? 0)
   const hasStock = stockCount > 0
+  const canAddToCart = Boolean(variant?.id) && hasStock && !isAddingToCart
   const isMadeJustForYou = categories.some((category) => (
     category.toLowerCase().replace(/[^a-z0-9]/g, "").includes("madejustforyou")
   ))
-
-  const details = [
-    variant?.name && `Variant: ${variant.name}`,
-    categoryLabel && `Series: ${categoryLabel}`,
-    "Hand-painted details",
-    "Includes careful gift-ready packaging",
-  ].filter(Boolean)
 
   const handleAddToCart = async () => {
     setCartMessage("")
@@ -222,6 +216,16 @@ function ProductDetails() {
 
     if (!variant?.id) {
       setCartError("Please choose an available variant.")
+      return
+    }
+
+    if (!hasStock) {
+      setCartError("This variant is out of stock.")
+      return
+    }
+
+    if (quantity > stockCount) {
+      setCartError(`Only ${stockCount} ${stockCount === 1 ? "item is" : "items are"} available.`)
       return
     }
 
@@ -404,6 +408,9 @@ function ProductDetails() {
                           onClick={() => {
                             setSelectedVariantId(item.id)
                             setSelectedImageIndex(0)
+                            setQuantity(1)
+                            setCartMessage("")
+                            setCartError("")
                           }}
                           role="option"
                           aria-selected={isSelected}
@@ -554,6 +561,7 @@ function ProductDetails() {
                   type="button"
                   aria-label="Decrease quantity"
                   onClick={() => setQuantity((current) => Math.max(1, current - 1))}
+                  disabled={!hasStock}
                 >
                   <LuMinus />
                 </button>
@@ -561,7 +569,8 @@ function ProductDetails() {
                 <button
                   type="button"
                   aria-label="Increase quantity"
-                  onClick={() => setQuantity((current) => current + 1)}
+                  onClick={() => setQuantity((current) => Math.min(stockCount, current + 1))}
+                  disabled={!hasStock || quantity >= stockCount}
                 >
                   <LuPlus />
                 </button>
@@ -573,7 +582,7 @@ function ProductDetails() {
                 className="primary add-cart-button"
                 type="button"
                 onClick={handleAddToCart}
-                disabled={isAddingToCart || !variant?.id}
+                disabled={!canAddToCart}
               >
                 <LuShoppingBag /> {isAddingToCart ? "Adding..." : "Add to Cart"}
               </button>

@@ -86,6 +86,55 @@ export const recalculateOrderTotal = async (orderId) => {
   return total
 }
 
+const getVariantStock = async (variantId) => {
+  const { data, error } = await supabase
+    .from("product_variants")
+    .select("stock, is_active")
+    .eq("id", variantId)
+    .single()
+
+  if (error) throw error
+
+  if (!data || data.is_active === false) {
+    throw new Error("Please choose an available product variant.")
+  }
+
+  return Math.max(0, Number(data.stock) || 0)
+}
+
+const getOrderVariantQuantity = async ({ orderId, variantId, exceptItemId = null }) => {
+  let query = supabase
+    .from("order_items")
+    .select("id, quantity")
+    .eq("order_id", orderId)
+    .eq("variant_id", variantId)
+
+  if (exceptItemId) {
+    query = query.neq("id", exceptItemId)
+  }
+
+  const { data, error } = await query
+
+  if (error) throw error
+
+  return (data || []).reduce((sum, item) => sum + (Number(item.quantity) || 0), 0)
+}
+
+const assertVariantStockAvailable = async ({ orderId, variantId, quantity, exceptItemId = null }) => {
+  const stock = await getVariantStock(variantId)
+
+  if (stock <= 0) {
+    throw new Error("This variant is out of stock.")
+  }
+
+  const existingQuantity = await getOrderVariantQuantity({ orderId, variantId, exceptItemId })
+  const requestedQuantity = existingQuantity + Math.max(0, Number(quantity) || 0)
+
+  if (requestedQuantity > stock) {
+    throw new Error(`Only ${stock} ${stock === 1 ? "item is" : "items are"} available.`)
+  }
+}
+
 export const addItemToCart = async ({
   userId,
   productId,
@@ -107,6 +156,13 @@ export const addItemToCart = async ({
 
   const order = await getOrCreatePendingOrder(userId)
   const nextQuantity = Math.max(1, Number(quantity) || 1)
+
+  await assertVariantStockAvailable({
+    orderId: order.id,
+    variantId,
+    quantity: nextQuantity,
+  })
+
   const hasCustomUpload = Boolean(customImageUrl)
   const normalizedBaseText = customBaseText.trim().slice(0, 40)
   const baseFee = normalizedBaseText ? Number(customBaseFee) || 0 : 0
@@ -310,6 +366,21 @@ export const updateCartItemQuantity = async ({ itemId, orderId, quantity }) => {
 
     if (error) throw error
   } else {
+    const { data: item, error: itemError } = await supabase
+      .from("order_items")
+      .select("variant_id")
+      .eq("id", itemId)
+      .single()
+
+    if (itemError) throw itemError
+
+    await assertVariantStockAvailable({
+      orderId,
+      variantId: item.variant_id,
+      quantity: nextQuantity,
+      exceptItemId: itemId,
+    })
+
     const { error } = await supabase
       .from("order_items")
       .update({ quantity: nextQuantity })
