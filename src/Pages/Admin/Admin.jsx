@@ -948,8 +948,7 @@ function OrdersPage() {
               <th>Total</th>
               <th>Date</th>
               <th>Timeline</th>
-              <th>Status</th>
-              <th>Update Stage</th>
+              <th>Status / Stage</th>
               <th>Tracking</th>
             </tr>
           </thead>
@@ -1026,12 +1025,10 @@ function OrdersPage() {
                       {getCountdownLabel(order)}
                     </span>
                   </td>
-                  <td>
+                  <td className="admin-order-stage-cell">
                     <span className={`admin-status ${order.status !== "delivered" ? "accent" : ""}`}>
                       {formatOrderStatus(order.status)}
                     </span>
-                  </td>
-                  <td>
                     <select
                       value={getAdminOrderStatusValue(order.status)}
                       onChange={(event) => updateOrderStatus(order.id, event.target.value)}

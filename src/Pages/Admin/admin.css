@@ -370,7 +370,7 @@
 .admin-table-card table {
   width: 100%;
   border-collapse: collapse;
-  min-width: 1120px;
+  min-width: 1040px;
 }
 
 .admin-table-card th,
@@ -498,6 +498,18 @@
 .admin-table-card .admin-order-row-dispatched .admin-status {
   background: #1f7a3a;
   color: #fff;
+}
+
+.admin-order-stage-cell {
+  min-width: 11rem;
+}
+
+.admin-order-stage-cell .admin-status {
+  margin-bottom: 0.5rem;
+}
+
+.admin-order-stage-cell select {
+  width: 100%;
 }
 
 .admin-table-card select {
