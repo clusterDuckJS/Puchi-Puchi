@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import ProductCard from '../../Components/ProductCard/ProductCard'
 import { supabase } from '../../utils/supabase'
 import { isTimeoutError, withRequestTimeout } from '../../utils/request'
+import { stripRichText } from '../../utils/richText'
 import './shop.css'
 
 const normalizeCategory = (category) => category?.trim().toLowerCase() || ''
@@ -118,7 +119,7 @@ function Shop() {
 
       const searchableText = [
         product.name,
-        product.description,
+        stripRichText(product.description),
         ...getProductCategories(product),
         ...(product.product_variants || []).map((variant) => variant.name),
       ].filter(Boolean).join(' ').toLowerCase()

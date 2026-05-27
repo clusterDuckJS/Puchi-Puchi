@@ -1,11 +1,15 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { createElement, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  LuBold,
   LuBoxes,
   LuChartNoAxesCombined,
   LuChevronDown,
   LuImagePlus,
   LuIndianRupee,
+  LuItalic,
   LuLayoutDashboard,
+  LuList,
+  LuListOrdered,
   LuLogOut,
   LuPackage,
   LuPenLine,
@@ -14,6 +18,7 @@ import {
   LuShoppingBag,
   LuStar,
   LuTrash2,
+  LuUnderline,
   LuUserRound,
   LuUsers,
   LuX,
@@ -24,11 +29,14 @@ import {
   formatOrderStatus,
   formatShortDate,
   getCountdownLabel,
+  getOrderDueDate,
   isMissingOrderNumberError,
+  normalizeOrderStatus,
   ORDER_STAGE_OPTIONS,
 } from "../../utils/orders";
 import { supabase } from "../../utils/supabase";
 import { isTimeoutError, withRequestTimeout } from "../../utils/request";
+import { sanitizeRichText, stripRichText } from "../../utils/richText";
 import "./admin.css";
 
 const currency = new Intl.NumberFormat("en-IN", {
@@ -164,9 +172,243 @@ function SearchField({ placeholder, value, onChange }) {
   );
 }
 
+const editorActions = [
+  { command: "bold", label: "Bold", icon: LuBold, tagName: "strong" },
+  { command: "italic", label: "Italic", icon: LuItalic, tagName: "em" },
+  { command: "underline", label: "Underline", icon: LuUnderline, tagName: "u" },
+  { command: "bulletList", label: "Bulleted list", icon: LuList, listTagName: "ul" },
+  { command: "numberedList", label: "Numbered list", icon: LuListOrdered, listTagName: "ol" },
+];
+
+function RichTextEditor({ id, value, onChange }) {
+  const editorRef = useRef(null);
+  const selectionRef = useRef(null);
+
+  const rememberSelection = useCallback(() => {
+    const selection = window.getSelection();
+
+    if (
+      selection?.rangeCount &&
+      editorRef.current?.contains(selection.anchorNode) &&
+      editorRef.current?.contains(selection.focusNode)
+    ) {
+      selectionRef.current = selection.getRangeAt(0);
+    }
+  }, []);
+
+  useEffect(() => {
+    const editor = editorRef.current;
+    const nextHtml = sanitizeRichText(value);
+
+    if (editor && document.activeElement !== editor && editor.innerHTML !== nextHtml) {
+      editor.innerHTML = nextHtml;
+    }
+  }, [value]);
+
+  useEffect(() => {
+    document.addEventListener("selectionchange", rememberSelection);
+
+    return () => {
+      document.removeEventListener("selectionchange", rememberSelection);
+    };
+  }, [rememberSelection]);
+
+  const syncValue = () => {
+    onChange(editorRef.current?.innerHTML || "");
+  };
+
+  const restoreSelection = () => {
+    const selection = window.getSelection();
+
+    if (!selectionRef.current || !selection || !editorRef.current) return;
+
+    selection.removeAllRanges();
+    selection.addRange(selectionRef.current);
+  };
+
+  const getFormattingRange = () => {
+    const selection = window.getSelection();
+    const activeRange = selection?.rangeCount ? selection.getRangeAt(0) : null;
+    const savedRange = selectionRef.current;
+    const editor = editorRef.current;
+
+    const range = activeRange && editor?.contains(activeRange.commonAncestorContainer)
+      ? activeRange
+      : savedRange;
+
+    if (range && !range.collapsed && editor?.contains(range.commonAncestorContainer)) {
+      return range;
+    }
+
+    if (!editor || !editor.textContent?.trim()) return null;
+
+    const fallbackRange = document.createRange();
+    fallbackRange.selectNodeContents(editor);
+    return fallbackRange;
+  };
+
+  const syncSanitizedValue = () => {
+    const nextHtml = sanitizeRichText(editorRef.current?.innerHTML || "");
+
+    if (editorRef.current && editorRef.current.innerHTML !== nextHtml) {
+      editorRef.current.innerHTML = nextHtml;
+    }
+
+    onChange(nextHtml);
+  };
+
+  const selectNode = (node) => {
+    const selection = window.getSelection();
+    const range = document.createRange();
+
+    range.selectNodeContents(node);
+    selection?.removeAllRanges();
+    selection?.addRange(range);
+    selectionRef.current = range;
+  };
+
+  const placeCaretAtEnd = (node) => {
+    const selection = window.getSelection();
+    const range = document.createRange();
+
+    range.selectNodeContents(node);
+    range.collapse(false);
+    selection?.removeAllRanges();
+    selection?.addRange(range);
+    selectionRef.current = range;
+  };
+
+  const applyInlineFormat = (tagName) => {
+    const range = getFormattingRange();
+
+    if (!range) return;
+
+    const wrapper = document.createElement(tagName);
+    wrapper.appendChild(range.extractContents());
+    range.insertNode(wrapper);
+    selectNode(wrapper);
+    syncValue();
+  };
+
+  const applyListFormat = (listTagName) => {
+    const range = getFormattingRange();
+    const editor = editorRef.current;
+
+    if (!range && !editor) return;
+
+    if (!range) {
+      const list = document.createElement(listTagName);
+      const listItem = document.createElement("li");
+      listItem.appendChild(document.createElement("br"));
+      list.appendChild(listItem);
+      editor.appendChild(list);
+      placeCaretAtEnd(listItem);
+      syncValue();
+      return;
+    }
+
+    const fragment = range.cloneContents();
+    const blockItems = Array.from(fragment.querySelectorAll("p, div, li"))
+      .map((item) => item.textContent?.trim())
+      .filter(Boolean);
+    const items = (blockItems.length ? blockItems : [range.toString()])
+      .flatMap((item) => item.split(/\n+/))
+      .map((item) => item.trim())
+      .filter(Boolean);
+
+    if (!items.length) return;
+
+    const list = document.createElement(listTagName);
+    items.forEach((item) => {
+      const listItem = document.createElement("li");
+      listItem.textContent = item;
+      list.appendChild(listItem);
+    });
+
+    range.deleteContents();
+    range.insertNode(list);
+    selectNode(list);
+    syncValue();
+  };
+
+  const runCommand = (action) => {
+    editorRef.current?.focus();
+    restoreSelection();
+
+    if (action.tagName) {
+      applyInlineFormat(action.tagName);
+    } else if (action.listTagName) {
+      applyListFormat(action.listTagName);
+    }
+
+    rememberSelection();
+  };
+
+  const handlePaste = (event) => {
+    event.preventDefault();
+    const text = event.clipboardData.getData("text/plain");
+    document.execCommand("insertText", false, text);
+    syncValue();
+  };
+
+  return (
+    <div className="admin-rich-text">
+      <div className="admin-rich-text-toolbar" aria-label="Description formatting">
+        {editorActions.map((action) => (
+          <button
+            type="button"
+            key={action.command}
+            onMouseDown={(event) => {
+              event.preventDefault();
+              rememberSelection();
+            }}
+            onClick={() => runCommand(action)}
+            aria-label={action.label}
+            title={action.label}
+          >
+            {createElement(action.icon)}
+          </button>
+        ))}
+      </div>
+      <div
+        id={id}
+        ref={editorRef}
+        className="admin-rich-text-input"
+        contentEditable
+        role="textbox"
+        aria-multiline="true"
+        onInput={syncValue}
+        onKeyUp={rememberSelection}
+        onMouseUp={rememberSelection}
+        onBlur={syncSanitizedValue}
+        onPaste={handlePaste}
+        suppressContentEditableWarning
+      />
+    </div>
+  );
+}
+
 const getAdminOrderStatusValue = (status) => (
   status === "ready_to_ship" || status === "shipped" ? "dispatched" : status || "paid"
 );
+
+const getAdminOrderRowClassName = (status) => {
+  const normalizedStatus = normalizeOrderStatus(status);
+
+  if (normalizedStatus === "cancelled" || normalizedStatus === "canceled") {
+    return "admin-order-row-cancelled";
+  }
+
+  if (
+    normalizedStatus === "dispatched" ||
+    normalizedStatus === "shipped" ||
+    normalizedStatus === "ready_to_ship"
+  ) {
+    return "admin-order-row-dispatched";
+  }
+
+  return "";
+};
 
 const formatChoiceLabel = (value) => (
   String(value || "standard")
@@ -412,6 +654,7 @@ function OrdersPage() {
   const [error, setError] = useState("");
   const [savingStatusId, setSavingStatusId] = useState("");
   const [savingTrackingId, setSavingTrackingId] = useState("");
+  const [timelineSort, setTimelineSort] = useState("desc");
 
   const fetchOrders = useCallback(async () => {
     setLoading(true);
@@ -649,6 +892,21 @@ function OrdersPage() {
     });
   }, [getCustomer, orderRows, query]);
 
+  const sortedOrders = useMemo(() => {
+    const direction = timelineSort === "asc" ? 1 : -1;
+
+    return [...filteredOrders].sort((firstOrder, secondOrder) => {
+      const firstTime = getOrderDueDate(firstOrder)?.getTime() || 0;
+      const secondTime = getOrderDueDate(secondOrder)?.getTime() || 0;
+
+      if (firstTime === secondTime) {
+        return String(firstOrder.id).localeCompare(String(secondOrder.id)) * direction;
+      }
+
+      return (firstTime - secondTime) * direction;
+    });
+  }, [filteredOrders, timelineSort]);
+
   return (
     <>
       <PageHeader
@@ -664,6 +922,21 @@ function OrdersPage() {
       )}
 
       {!loading && !error && filteredOrders.length > 0 && (
+      <>
+      <div className="admin-order-controls">
+        <label className="admin-sort-control">
+          <span>Sort timeline</span>
+          <select
+            value={timelineSort}
+            onChange={(event) => setTimelineSort(event.target.value)}
+            aria-label="Sort orders by production timeline"
+          >
+            <option value="desc">Descending</option>
+            <option value="asc">Ascending</option>
+          </select>
+        </label>
+      </div>
+
       <div className="admin-table-card">
         <table>
           <thead>
@@ -681,7 +954,7 @@ function OrdersPage() {
             </tr>
           </thead>
           <tbody>
-            {filteredOrders.map((order) => {
+            {sortedOrders.map((order) => {
               const customer = getCustomer(order);
               const address = order.delivery_address || {};
               const itemCount = (order.order_items || []).reduce(
@@ -690,7 +963,7 @@ function OrdersPage() {
               );
 
               return (
-                <tr key={order.id}>
+                <tr key={order.id} className={getAdminOrderRowClassName(order.status)}>
                   <td>#{formatOrderNumber(order)}</td>
                   <td className="admin-customer-cell">
                     <p>{customer.name}</p>
@@ -796,6 +1069,7 @@ function OrdersPage() {
           </tbody>
         </table>
       </div>
+      </>
       )}
     </>
   );
@@ -935,6 +1209,8 @@ function UsersPage() {
 function AdminReviewsPage() {
   const [reviews, setReviews] = useState([]);
   const [form, setForm] = useState(createBlankAdminReviewForm);
+  const [reviewProducts, setReviewProducts] = useState([]);
+  const [isProductMenuOpen, setIsProductMenuOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -968,9 +1244,31 @@ function AdminReviewsPage() {
     }
   }, []);
 
+  const fetchReviewProducts = useCallback(async () => {
+    try {
+      const { data, error } = await withRequestTimeout(supabase
+        .from("products")
+        .select("id, name, categories, category, is_active")
+        .order("name", { ascending: true }));
+
+      if (error) throw error;
+
+      setReviewProducts(data || []);
+    } catch (error) {
+      console.error("Admin review products error:", error);
+      setReviewProducts([]);
+      setError(
+        isTimeoutError(error)
+          ? "Products are taking too long to load. Please refresh in a moment."
+          : "We could not load products for review selection."
+      );
+    }
+  }, []);
+
   useEffect(() => {
     fetchReviews();
-  }, [fetchReviews]);
+    fetchReviewProducts();
+  }, [fetchReviews, fetchReviewProducts]);
 
   const filteredReviews = useMemo(() => {
     const searchTerm = query.trim().toLowerCase();
@@ -987,6 +1285,35 @@ function AdminReviewsPage() {
     ));
   }, [query, reviews]);
 
+  const filteredReviewProducts = useMemo(() => {
+    const searchTerm = form.product_name.trim().toLowerCase();
+    const products = reviewProducts.filter((product) => product.name);
+
+    if (!searchTerm) return products.slice(0, 8);
+
+    return products
+      .filter((product) => {
+        const categories = parseListField(product.categories || product.category).join(" ");
+
+        return [product.name, categories]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase()
+          .includes(searchTerm);
+      })
+      .slice(0, 8);
+  }, [form.product_name, reviewProducts]);
+
+  const selectedReviewProduct = useMemo(() => {
+    const productName = form.product_name.trim().toLowerCase();
+
+    if (!productName) return null;
+
+    return reviewProducts.find((product) => (
+      product.name?.trim().toLowerCase() === productName
+    )) || null;
+  }, [form.product_name, reviewProducts]);
+
   const handleFormChange = (field, value) => {
     setError("");
     setMessage("");
@@ -994,6 +1321,16 @@ function AdminReviewsPage() {
       ...current,
       [field]: value,
     }));
+  };
+
+  const handleProductInputChange = (value) => {
+    handleFormChange("product_name", value.slice(0, 120));
+    setIsProductMenuOpen(true);
+  };
+
+  const selectReviewProduct = (product) => {
+    handleFormChange("product_name", product.name || "");
+    setIsProductMenuOpen(false);
   };
 
   const saveReview = async (event) => {
@@ -1016,6 +1353,13 @@ function AdminReviewsPage() {
     if (!payload.reviewer_first_name || !payload.place || !payload.product_name || !payload.review_text) {
       setError("Please fill every review field.");
       setSaving(false);
+      return;
+    }
+
+    if (!selectedReviewProduct) {
+      setError("Please choose a product from the list.");
+      setSaving(false);
+      setIsProductMenuOpen(true);
       return;
     }
 
@@ -1109,13 +1453,53 @@ function AdminReviewsPage() {
             </label>
             <label className="admin-form-wide">
               Product name
-              <input
-                type="text"
-                value={form.product_name}
-                onChange={(event) => handleFormChange("product_name", event.target.value.slice(0, 120))}
-                maxLength={120}
-                required
-              />
+              <div className="admin-product-combobox">
+                <input
+                  type="text"
+                  value={form.product_name}
+                  onChange={(event) => handleProductInputChange(event.target.value)}
+                  onFocus={() => setIsProductMenuOpen(true)}
+                  onBlur={() => window.setTimeout(() => setIsProductMenuOpen(false), 120)}
+                  maxLength={120}
+                  role="combobox"
+                  aria-expanded={isProductMenuOpen}
+                  aria-controls="admin-review-product-options"
+                  aria-autocomplete="list"
+                  autoComplete="off"
+                  placeholder="Start typing a product"
+                  required
+                />
+                <LuChevronDown aria-hidden="true" />
+                {isProductMenuOpen && (
+                  <div className="admin-product-options" id="admin-review-product-options" role="listbox">
+                    {filteredReviewProducts.length > 0 ? (
+                      filteredReviewProducts.map((product) => {
+                        const categories = parseListField(product.categories || product.category);
+
+                        return (
+                          <button
+                            type="button"
+                            role="option"
+                            aria-selected={selectedReviewProduct?.id === product.id}
+                            key={product.id}
+                            onMouseDown={(event) => event.preventDefault()}
+                            onClick={() => selectReviewProduct(product)}
+                          >
+                            <span>{product.name}</span>
+                            <small>
+                              {categories.length ? categories.join(", ") : "Uncategorized"}
+                              {product.is_active === false ? " - hidden" : ""}
+                            </small>
+                          </button>
+                        );
+                      })
+                    ) : (
+                      <p>No matching products.</p>
+                    )}
+                  </div>
+                )}
+              </div>
+              <small className="admin-field-help">Choose one of the products already in the catalog.</small>
             </label>
             <label>
               Rating
@@ -1308,11 +1692,10 @@ function ProductFormModal({
 
           <fieldset className="admin-form-wide">
             <label htmlFor="productDescription">Description</label>
-            <textarea
+            <RichTextEditor
               id="productDescription"
               value={form.description}
-              onChange={(event) => onProductChange("description", event.target.value)}
-              rows={3}
+              onChange={(value) => onProductChange("description", value)}
             />
           </fieldset>
         </div>
@@ -1552,8 +1935,9 @@ function ProductsPage() {
 
     return products.filter((product) => {
       const categories = parseListField(product.categories || product.category).join(" ");
+      const description = stripRichText(product.description);
 
-      return [product.name, categories, product.description]
+      return [product.name, categories, description]
         .filter(Boolean)
         .some((value) => value.toLowerCase().includes(normalizedQuery));
     });
@@ -1757,7 +2141,7 @@ function ProductsPage() {
       name: form.name.trim(),
       category: categories[0] || null,
       categories,
-      description: form.description.trim() || null,
+      description: sanitizeRichText(form.description) || null,
       is_custom: form.is_custom,
       is_active: form.is_active,
       is_featured: form.is_featured,

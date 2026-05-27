@@ -6,6 +6,7 @@ import { supabase } from '../../utils/supabase'
 import ProductCard from '../../Components/ProductCard/ProductCard'
 import { addItemToCart, CUSTOM_BASE_FEE, formatCartPrice, getCurrentUserId, uploadCustomOrderImage } from '../../utils/cart'
 import { isTimeoutError, withRequestTimeout } from '../../utils/request'
+import { sanitizeRichText } from '../../utils/richText'
 
 const CUSTOM_IMAGE_MAX_BYTES = 15 * 1024 * 1024
 const CUSTOM_BASE_TEXT_MAX_LENGTH = 40
@@ -203,6 +204,7 @@ function ProductDetails() {
   const image = variantImages[selectedImageIndex] || variantImages[0] || PRODUCT_PLACEHOLDER_IMAGE
   const categories = parseListField(product.categories || product.category)
   const categoryLabel = categories.join(", ")
+  const descriptionHtml = sanitizeRichText(product.description)
   const stockCount = Number(variant?.stock ?? 0)
   const hasStock = stockCount > 0
   const canAddToCart = Boolean(variant?.id) && hasStock && !isAddingToCart
@@ -371,9 +373,14 @@ function ProductDetails() {
               </p>
             )}
 
-            <p className="product-description">
-              {product.description || "No description available"}
-            </p>
+            {descriptionHtml ? (
+              <div
+                className="product-description"
+                dangerouslySetInnerHTML={{ __html: descriptionHtml }}
+              />
+            ) : (
+              <p className="product-description">No description available</p>
+            )}
 
             {variants.length > 1 && (
               <div className="variant-picker">

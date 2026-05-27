@@ -149,7 +149,7 @@ function Reviews() {
       if (error) throw error;
 
       setForm(createBlankReviewForm());
-      setFormStatus("Thank you. Your review has been submitted and will appear after approval.");
+      setFormStatus("Thank you. Your review has been submitted and will appear soon!");
     } catch (error) {
       console.error("Review submit error:", error);
       setFormError("We could not submit your review right now. Please try again.");

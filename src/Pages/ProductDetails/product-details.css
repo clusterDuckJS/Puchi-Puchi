@@ -127,7 +127,29 @@
     color: #9a6577;
     font-size: 0.98rem;
     line-height: 1.65;
-    white-space: pre-line;
+}
+
+.product-description p,
+.product-description ul,
+.product-description ol {
+    margin: 0 0 0.85rem;
+}
+
+.product-description p:last-child,
+.product-description ul:last-child,
+.product-description ol:last-child {
+    margin-bottom: 0;
+}
+
+.product-description ul,
+.product-description ol {
+    padding-left: 1.25rem;
+}
+
+.product-description strong,
+.product-description b {
+    color: #3c1d2d;
+    font-weight: 800;
 }
 
 .variant-picker {
