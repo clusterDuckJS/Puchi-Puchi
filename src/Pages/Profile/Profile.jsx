@@ -101,9 +101,18 @@ function OrderTimelineMeta({ order }) {
     <div className="profile-order-timeline-meta">
       <span>{getCountdownLabel(order)}</span>
       {order.tracking_id && (
-        <span>
-          Tracking ID: <strong>{order.tracking_id}</strong>
-        </span>
+        <>
+          <span>
+            Tracking ID: <strong>{order.tracking_id}</strong>
+          </span>
+          <p className="profile-tracking-note">
+            Sent via India Post. Track it at{" "}
+            <a href="https://www.indiapost.gov.in/" target="_blank" rel="noreferrer">
+              indiapost.gov.in
+            </a>
+            . Tracking can take up to 24 hours to become active.
+          </p>
+        </>
       )}
       {order.dispatched_at && (
         <span>Dispatched {formatShortDate(order.dispatched_at)}</span>

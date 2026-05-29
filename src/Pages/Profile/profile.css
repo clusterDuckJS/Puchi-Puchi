@@ -317,6 +317,26 @@
   color: #321528;
 }
 
+.profile-tracking-note {
+  flex-basis: 100%;
+  max-width: 42rem;
+  margin: -0.1rem 0 0;
+  color: #8d6b75;
+  font-size: 0.82rem;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
+.profile-tracking-note a {
+  color: var(--color-primary);
+  font-weight: 900;
+  text-decoration: none;
+}
+
+.profile-tracking-note a:hover {
+  text-decoration: underline;
+}
+
 .profile-order-item-row {
   display: grid;
   grid-template-columns: 4.5rem minmax(0, 1fr) max-content;
