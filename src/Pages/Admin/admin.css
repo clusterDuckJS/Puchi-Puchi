@@ -830,6 +830,15 @@
 .admin-rich-text-input ul,
 .admin-rich-text-input ol {
   padding-left: 1.25rem;
+  list-style-position: outside;
+}
+
+.admin-rich-text-input ul > li {
+  list-style: disc;
+}
+
+.admin-rich-text-input ol > li {
+  list-style: decimal;
 }
 
 .admin-rich-text-input strong,

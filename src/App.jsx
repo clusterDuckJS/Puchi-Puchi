@@ -1,4 +1,4 @@
-import { Suspense, lazy, useEffect, useState } from 'react';
+import { Suspense, lazy, useEffect, useRef, useState } from 'react';
 import Header from './Components/Header/Header'
 import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import Footer from './Components/Footer/Footer';
@@ -45,11 +45,23 @@ function App() {
   const [profile, setProfile] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [profileLoading, setProfileLoading] = useState(false);
+  const sessionUserIdRef = useRef(null);
+  const profileUserIdRef = useRef(null);
 
   const navigate = useNavigate();
   const location = useLocation();
   const isAdminRoute = location.pathname.startsWith("/admin");
-  const isCheckingAdminAccess = authLoading || (session?.user && profileLoading);
+  const sessionUserId = session?.user?.id ?? null;
+  const hasLoadedCurrentProfile = Boolean(sessionUserId && profile?.id === sessionUserId);
+  const isCheckingAdminAccess = authLoading || Boolean(sessionUserId && profileLoading && !hasLoadedCurrentProfile);
+
+  useEffect(() => {
+    sessionUserIdRef.current = sessionUserId;
+  }, [sessionUserId]);
+
+  useEffect(() => {
+    profileUserIdRef.current = profile?.id ?? null;
+  }, [profile?.id]);
 
   const createProfile = async (user) => {
     const metadata = user.user_metadata ?? {};
@@ -112,10 +124,20 @@ function App() {
   useEffect(() => {
     const { data: listener } = supabase.auth.onAuthStateChange(
       (event, nextSession) => {
-        if (nextSession?.user) {
-          setProfileLoading(true);
+        const nextUserId = nextSession?.user?.id ?? null;
+
+        if (nextUserId) {
+          const isSameUser = sessionUserIdRef.current === nextUserId;
+          const hasLoadedProfile = profileUserIdRef.current === nextUserId;
+
+          if (!isSameUser) {
+            setProfile(null);
+          }
+
+          setProfileLoading(!isSameUser || !hasLoadedProfile);
         } else {
           setProfileLoading(false);
+          setProfile(null);
         }
 
         setSession(nextSession);

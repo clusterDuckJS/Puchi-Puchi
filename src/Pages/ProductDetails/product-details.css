@@ -144,6 +144,15 @@
 .product-description ul,
 .product-description ol {
     padding-left: 1.25rem;
+    list-style-position: outside;
+}
+
+.product-description ul > li {
+    list-style: disc;
+}
+
+.product-description ol > li {
+    list-style: decimal;
 }
 
 .product-description strong,

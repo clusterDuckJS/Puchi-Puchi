@@ -278,6 +278,32 @@ function RichTextEditor({ id, value, onChange }) {
     selectionRef.current = range;
   };
 
+  const ensureSelectionInEditor = () => {
+    const editor = editorRef.current;
+    const selection = window.getSelection();
+
+    if (!editor || !selection) return false;
+
+    if (
+      selection.rangeCount &&
+      editor.contains(selection.anchorNode) &&
+      editor.contains(selection.focusNode)
+    ) {
+      return true;
+    }
+
+    if (!editor.childNodes.length) {
+      const paragraph = document.createElement("p");
+      paragraph.appendChild(document.createElement("br"));
+      editor.appendChild(paragraph);
+      placeCaretAtEnd(paragraph);
+      return true;
+    }
+
+    placeCaretAtEnd(editor.lastChild);
+    return true;
+  };
+
   const applyInlineFormat = (tagName) => {
     const range = getFormattingRange();
 
@@ -291,43 +317,15 @@ function RichTextEditor({ id, value, onChange }) {
   };
 
   const applyListFormat = (listTagName) => {
-    const range = getFormattingRange();
     const editor = editorRef.current;
 
-    if (!range && !editor) return;
+    if (!editor || !ensureSelectionInEditor()) return;
 
-    if (!range) {
-      const list = document.createElement(listTagName);
-      const listItem = document.createElement("li");
-      listItem.appendChild(document.createElement("br"));
-      list.appendChild(listItem);
-      editor.appendChild(list);
-      placeCaretAtEnd(listItem);
-      syncValue();
-      return;
-    }
-
-    const fragment = range.cloneContents();
-    const blockItems = Array.from(fragment.querySelectorAll("p, div, li"))
-      .map((item) => item.textContent?.trim())
-      .filter(Boolean);
-    const items = (blockItems.length ? blockItems : [range.toString()])
-      .flatMap((item) => item.split(/\n+/))
-      .map((item) => item.trim())
-      .filter(Boolean);
-
-    if (!items.length) return;
-
-    const list = document.createElement(listTagName);
-    items.forEach((item) => {
-      const listItem = document.createElement("li");
-      listItem.textContent = item;
-      list.appendChild(listItem);
-    });
-
-    range.deleteContents();
-    range.insertNode(list);
-    selectNode(list);
+    document.execCommand(
+      listTagName === "ol" ? "insertOrderedList" : "insertUnorderedList",
+      false,
+      null
+    );
     syncValue();
   };
 
