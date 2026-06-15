@@ -47,6 +47,13 @@ const currency = new Intl.NumberFormat("en-IN", {
 
 const USER_DISPLAY_ID_START = 1;
 const PRODUCT_PLACEHOLDER_IMAGE = "/product-placeholder.svg";
+const ADMIN_REVIEW_REPLY_NAME = "Puchi Puchi";
+const ADMIN_REVIEW_REPLY_SCHEMA_ERROR = "Review replies need the latest Supabase migration. Refresh the admin page, then try again.";
+
+const isMissingReviewReplyColumnError = (error, columnName) => (
+  error?.message?.includes(columnName) &&
+  error?.message?.includes("schema cache")
+);
 
 const adminNav = [
   { to: "/admin", label: "Overview", icon: LuLayoutDashboard, end: true },
@@ -1204,11 +1211,13 @@ function UsersPage() {
 function AdminReviewsPage() {
   const [reviews, setReviews] = useState([]);
   const [form, setForm] = useState(createBlankAdminReviewForm);
+  const [replyDrafts, setReplyDrafts] = useState({});
   const [reviewProducts, setReviewProducts] = useState([]);
   const [isProductMenuOpen, setIsProductMenuOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [savingReplyId, setSavingReplyId] = useState("");
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
 
@@ -1226,6 +1235,10 @@ function AdminReviewsPage() {
       if (error) throw error;
 
       setReviews(data || []);
+      setReplyDrafts(Object.fromEntries((data || []).map((review) => [
+        review.id,
+        review.admin_reply_text || "",
+      ])));
     } catch (error) {
       console.error("Admin reviews error:", error);
       setError(
@@ -1276,6 +1289,7 @@ function AdminReviewsPage() {
         review.place,
         review.product_name,
         review.review_text,
+        review.admin_reply_text,
       ].filter(Boolean).join(" ").toLowerCase().includes(searchTerm)
     ));
   }, [query, reviews]);
@@ -1392,6 +1406,90 @@ function AdminReviewsPage() {
       item.id === review.id ? { ...item, is_approved: isApproved } : item
     )));
   };
+
+  const handleReplyChange = (reviewId, value) => {
+    setError("");
+    setMessage("");
+    setReplyDrafts((current) => ({
+      ...current,
+      [reviewId]: value.slice(0, 1000),
+    }));
+  };
+
+  const saveReviewReply = async (review) => {
+    const replyText = (replyDrafts[review.id] ?? review.admin_reply_text ?? "").trim();
+    const replyDate = replyText ? new Date().toISOString() : null;
+
+    setSavingReplyId(review.id);
+    setError("");
+    setMessage("");
+
+    let savedReplyDate = replyDate;
+    let { error } = await supabase
+      .from("reviews")
+      .update({
+        admin_reply_text: replyText || null,
+        admin_reply_date: replyDate,
+      })
+      .eq("id", review.id);
+
+    if (isMissingReviewReplyColumnError(error, "admin_reply_date")) {
+      savedReplyDate = review.admin_reply_date || null;
+      ({ error } = await supabase
+        .from("reviews")
+        .update({
+          admin_reply_text: replyText || null,
+        })
+        .eq("id", review.id));
+    }
+
+    if (error) {
+      setError(
+        isMissingReviewReplyColumnError(error, "admin_reply_text")
+          ? ADMIN_REVIEW_REPLY_SCHEMA_ERROR
+          : error.message
+      );
+      setSavingReplyId("");
+      return;
+    }
+
+    setReviews((current) => current.map((item) => (
+      item.id === review.id
+        ? {
+          ...item,
+          admin_reply_text: replyText || null,
+          admin_reply_date: savedReplyDate,
+        }
+        : item
+    )));
+    setReplyDrafts((current) => ({
+      ...current,
+      [review.id]: replyText,
+    }));
+    const replySaveMessage = replyText && !review.is_approved
+      ? "Reply saved. It will show on the reviews page after this review is approved."
+      : `Reply saved as ${ADMIN_REVIEW_REPLY_NAME}.`;
+
+    setMessage(replyText ? replySaveMessage : "Reply removed.");
+    setSavingReplyId("");
+  };
+
+  const getReviewReplyDraft = (review) => (
+    replyDrafts[review.id] ?? review.admin_reply_text ?? ""
+  );
+
+  const getReviewReplyButtonLabel = (review) => {
+    const replyText = getReviewReplyDraft(review).trim();
+
+    if (savingReplyId === review.id) return "Saving...";
+    if (!replyText && review.admin_reply_text) return "Remove Reply";
+    return "Save Reply";
+  };
+
+  const isReviewReplySaveDisabled = (review) => (
+    savingReplyId === review.id ||
+    (!review.admin_reply_text && !getReviewReplyDraft(review).trim())
+  );
 
   const deleteReview = async (review) => {
     const shouldDelete = window.confirm(`Delete review from ${review.reviewer_first_name}?`);
@@ -1562,6 +1660,31 @@ function AdminReviewsPage() {
                     <em>{review.rating}/5</em>
                   </header>
                   <p>{review.review_text}</p>
+                  <section className="admin-review-reply" aria-label={`Reply to ${review.reviewer_first_name}'s review`}>
+                    <div className="admin-review-reply-heading">
+                      <strong>Reply as {ADMIN_REVIEW_REPLY_NAME}</strong>
+                      {review.admin_reply_date && (
+                        <span>{formatShortDate(review.admin_reply_date)}</span>
+                      )}
+                    </div>
+                    <textarea
+                      value={getReviewReplyDraft(review)}
+                      onChange={(event) => handleReplyChange(review.id, event.target.value)}
+                      placeholder="Add a public reply..."
+                      rows={3}
+                      maxLength={1000}
+                    />
+                    <div className="admin-review-reply-actions">
+                      <small>{getReviewReplyDraft(review).length}/1000 characters</small>
+                      <button
+                        type="button"
+                        onClick={() => saveReviewReply(review)}
+                        disabled={isReviewReplySaveDisabled(review)}
+                      >
+                        {getReviewReplyButtonLabel(review)}
+                      </button>
+                    </div>
+                  </section>
                   <footer>
                     <span>{formatShortDate(review.review_date)} - {review.is_approved ? "Approved" : "Pending"}</span>
                     <div>
@@ -1571,7 +1694,7 @@ function AdminReviewsPage() {
                       >
                         {review.is_approved ? "Hide" : "Approve"}
                       </button>
-                      <button type="button" onClick={() => deleteReview(review)}>
+                      <button className="admin-review-delete" type="button" onClick={() => deleteReview(review)}>
                         Delete
                       </button>
                     </div>

@@ -1267,6 +1267,45 @@
   line-height: 1.55;
 }
 
+.admin-review-reply {
+  display: grid;
+  gap: 0.55rem;
+  padding-left: 0.8rem;
+  border-left: 3px solid rgb(221 95 137 / 24%);
+}
+
+.admin-review-reply-heading,
+.admin-review-reply-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.admin-review-reply-heading strong {
+  color: #352026;
+  font-size: 0.86rem;
+  font-weight: 900;
+}
+
+.admin-review-reply-heading span,
+.admin-review-reply-actions small {
+  color: rgb(83 45 51 / 54%);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.admin-review-reply textarea {
+  width: 100%;
+  min-height: 88px;
+  padding: 0.75rem 0.85rem;
+  border: 1px solid rgb(221 95 137 / 16%);
+  border-radius: 14px;
+  background: #fffdf9;
+  color: #352026;
+  resize: vertical;
+}
+
 .admin-review-card em {
   color: var(--color-primary);
   font-style: normal;
@@ -1291,7 +1330,7 @@
   font-weight: 800;
 }
 
-.admin-review-card button:last-child {
+.admin-review-card .admin-review-delete {
   color: var(--color-error);
 }
 

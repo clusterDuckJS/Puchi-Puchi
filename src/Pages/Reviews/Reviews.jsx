@@ -5,6 +5,8 @@ import { supabase } from "../../utils/supabase";
 import { isTimeoutError, withRequestTimeout } from "../../utils/request";
 import "./reviews.css";
 
+const REVIEW_REPLY_NAME = "Puchi Puchi";
+
 const createBlankReviewForm = () => ({
   reviewer_first_name: "",
   place: "",
@@ -30,6 +32,22 @@ const StarRating = ({ rating }) => (
     ))}
   </div>
 );
+
+const ReviewReply = ({ review, className = "" }) => {
+  if (!review.admin_reply_text) return null;
+
+  return (
+    <div className={["review-reply", className].filter(Boolean).join(" ")}>
+      <div>
+        <strong>{REVIEW_REPLY_NAME}</strong>
+        {review.admin_reply_date && (
+          <span>{formatReviewDate(review.admin_reply_date)}</span>
+        )}
+      </div>
+      <p>{review.admin_reply_text}</p>
+    </div>
+  );
+};
 
 function Reviews() {
   const location = useLocation();
@@ -325,6 +343,7 @@ function Reviews() {
                     <StarRating rating={review.rating} />
                     <strong>{review.product_name}</strong>
                     <p>{review.review_text}</p>
+                    <ReviewReply review={review} />
                   </article>
                 ))}
               </div>
