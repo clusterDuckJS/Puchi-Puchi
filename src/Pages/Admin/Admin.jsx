@@ -4,6 +4,7 @@ import {
   LuBoxes,
   LuChartNoAxesCombined,
   LuChevronDown,
+  LuImages,
   LuImagePlus,
   LuIndianRupee,
   LuItalic,
@@ -19,6 +20,7 @@ import {
   LuStar,
   LuTrash2,
   LuUnderline,
+  LuUpload,
   LuUserRound,
   LuUsers,
   LuX,
@@ -47,6 +49,21 @@ const currency = new Intl.NumberFormat("en-IN", {
 
 const USER_DISPLAY_ID_START = 1;
 const PRODUCT_PLACEHOLDER_IMAGE = "/product-placeholder.svg";
+const SITE_ASSETS_BUCKET = "site-assets";
+const PRODUCT_ASSETS_FOLDER = "products";
+const GALLERY_ASSETS_FOLDER = "gallery";
+const SITE_ASSET_MAX_BYTES = 10 * 1024 * 1024;
+const SITE_ASSET_MIME_TYPES = new Map([
+  ["avif", "image/avif"],
+  ["gif", "image/gif"],
+  ["jpeg", "image/jpeg"],
+  ["jpg", "image/jpeg"],
+  ["png", "image/png"],
+  ["webp", "image/webp"],
+]);
+const SITE_ASSET_CONTENT_TYPES = new Set(SITE_ASSET_MIME_TYPES.values());
+const SITE_ASSET_IMAGE_ACCEPT = [...SITE_ASSET_CONTENT_TYPES].join(",");
+const SITE_ASSET_ALLOWED_LABEL = "JPG, PNG, WEBP, GIF, or AVIF";
 const ADMIN_REVIEW_REPLY_NAME = "Puchi Puchi";
 const ADMIN_REVIEW_REPLY_SCHEMA_ERROR = "Review replies need the latest Supabase migration. Refresh the admin page, then try again.";
 
@@ -61,6 +78,7 @@ const adminNav = [
   { to: "/admin/users", label: "Users", icon: LuUserRound },
   { to: "/admin/reviews", label: "Reviews", icon: LuStar },
   { to: "/admin/products", label: "Products", icon: LuShoppingBag },
+  { to: "/admin/gallery", label: "Gallery", icon: LuImages },
 ];
 
 const PRODUCT_CATEGORY_OPTIONS = [
@@ -76,6 +94,81 @@ const PRODUCT_CATEGORY_OPTIONS = [
 ];
 
 const normalizeListValue = (value) => value.trim().replace(/\s+/g, " ");
+
+const getFileExtension = (fileName = "") => (
+  fileName.split(".").pop()?.toLowerCase().replace(/[^a-z0-9]/g, "") || ""
+);
+
+const getSiteAssetFileInfo = (file) => {
+  if (!file) {
+    throw new Error("Choose an image to upload.");
+  }
+
+  const fileExtension = getFileExtension(file.name);
+  const inferredType = SITE_ASSET_MIME_TYPES.get(fileExtension);
+  const contentType = SITE_ASSET_CONTENT_TYPES.has(file.type)
+    ? file.type
+    : inferredType;
+
+  if (!contentType) {
+    throw new Error(`Upload ${SITE_ASSET_ALLOWED_LABEL} images only.`);
+  }
+
+  if (file.size > SITE_ASSET_MAX_BYTES) {
+    throw new Error("Image must be 10MB or smaller.");
+  }
+
+  const contentExtension = [...SITE_ASSET_MIME_TYPES.entries()]
+    .find(([, mimeType]) => mimeType === contentType)?.[0] || "jpg";
+
+  return {
+    contentType,
+    extension: fileExtension && SITE_ASSET_MIME_TYPES.has(fileExtension)
+      ? fileExtension.replace("jpeg", "jpg")
+      : contentExtension.replace("jpeg", "jpg"),
+  };
+};
+
+const isSiteAssetImageName = (fileName = "") => SITE_ASSET_MIME_TYPES.has(getFileExtension(fileName));
+
+const createStorageAssetName = (extension) => {
+  const randomId = globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
+  return `${Date.now()}-${randomId}.${extension}`;
+};
+
+const getSiteAssetUploadErrorMessage = (error) => {
+  const message = error?.message || "";
+
+  if (message.toLowerCase().includes("row-level security")) {
+    return "Supabase blocked the upload. Apply the latest site-assets storage policy migration, then confirm this account still has the admin role.";
+  }
+
+  return message || "We could not upload that image.";
+};
+
+const uploadSiteAssetImage = async (file, folder) => {
+  const { contentType, extension } = getSiteAssetFileInfo(file);
+  const filePath = `${folder}/${createStorageAssetName(extension)}`;
+  const { error } = await supabase.storage
+    .from(SITE_ASSETS_BUCKET)
+    .upload(filePath, file, {
+      cacheControl: "31536000",
+      contentType,
+      upsert: false,
+    });
+
+  if (error) throw new Error(getSiteAssetUploadErrorMessage(error));
+
+  const { data } = supabase.storage
+    .from(SITE_ASSETS_BUCKET)
+    .getPublicUrl(filePath);
+
+  return {
+    path: filePath,
+    publicUrl: data.publicUrl,
+  };
+};
 
 const parseListField = (value) => {
   if (Array.isArray(value)) {
@@ -1720,14 +1813,18 @@ function ProductFormModal({
   onRemoveCategory,
   onVariantChange,
   onVariantImageChange,
+  onVariantImageUpload,
   onAddVariantImage,
   onRemoveVariantImage,
   onAddVariant,
   onRemoveVariant,
   onSubmit,
+  uploadingImageKey,
   saving,
   error,
 }) {
+  const isBusy = saving || Boolean(uploadingImageKey);
+
   return (
     <div className="admin-modal-overlay" role="presentation">
       <form className="admin-product-modal" onSubmit={onSubmit}>
@@ -1861,7 +1958,7 @@ function ProductFormModal({
 
         <div className="admin-variant-header">
           <h3>Variants</h3>
-          <button type="button" onClick={onAddVariant}>
+          <button type="button" onClick={onAddVariant} disabled={isBusy}>
             <LuPlus />
             <span>Add Variant</span>
           </button>
@@ -1873,7 +1970,7 @@ function ProductFormModal({
               <div className="admin-variant-card-header">
                 <strong>Variant {index + 1}</strong>
                 {form.variants.length > 1 && (
-                  <button type="button" aria-label={`Remove variant ${index + 1}`} onClick={() => onRemoveVariant(index)}>
+                  <button type="button" aria-label={`Remove variant ${index + 1}`} disabled={isBusy} onClick={() => onRemoveVariant(index)}>
                     <LuTrash2 />
                   </button>
                 )}
@@ -1931,39 +2028,73 @@ function ProductFormModal({
                 <fieldset className="admin-form-wide">
                   <div className="admin-variant-images-heading">
                     <label>Variant Images</label>
-                    <button
-                      type="button"
-                      onClick={() => onAddVariantImage(index)}
-                      disabled={variant.image_urls.length >= 5}
-                    >
+                      <button
+                        type="button"
+                        onClick={() => onAddVariantImage(index)}
+                        disabled={isBusy || variant.image_urls.length >= 5}
+                      >
                       <LuImagePlus />
                       <span>Add Image</span>
                     </button>
                   </div>
 
                   <div className="admin-variant-images">
-                    {variant.image_urls.map((imageUrl, imageIndex) => (
+                    {variant.image_urls.map((imageUrl, imageIndex) => {
+                      const uploadKey = `${index}-${imageIndex}`;
+                      const isUploadingImage = uploadingImageKey === uploadKey;
+
+                      return (
                       <div className="admin-variant-image-row" key={imageIndex}>
+                        {imageUrl ? (
+                          <img
+                            className="admin-variant-image-preview"
+                            src={imageUrl}
+                            alt=""
+                            loading="lazy"
+                          />
+                        ) : (
+                          <span className="admin-variant-image-empty" aria-hidden="true">
+                            <LuImagePlus />
+                          </span>
+                        )}
                         <input
                           id={`variantImage-${index}-${imageIndex}`}
                           type="url"
                           value={imageUrl}
-                          placeholder={`Image URL ${imageIndex + 1}`}
+                          placeholder={`Image URL ${imageIndex + 1}, or choose a file`}
                           onChange={(event) => onVariantImageChange(index, imageIndex, event.target.value)}
                         />
+                        <label
+                          className={`admin-file-upload-button ${isUploadingImage ? "is-disabled" : ""}`}
+                          aria-disabled={isBusy}
+                        >
+                          <input
+                            type="file"
+                            accept={SITE_ASSET_IMAGE_ACCEPT}
+                            disabled={isBusy}
+                            onChange={async (event) => {
+                              await onVariantImageUpload(index, imageIndex, event.target.files?.[0]);
+                              event.target.value = "";
+                            }}
+                          />
+                          <LuUpload />
+                          <span>{isUploadingImage ? "Uploading" : "Choose"}</span>
+                        </label>
                         {variant.image_urls.length > 1 && (
                           <button
                             type="button"
                             aria-label={`Remove image ${imageIndex + 1}`}
+                            disabled={isBusy}
                             onClick={() => onRemoveVariantImage(index, imageIndex)}
                           >
                             <LuTrash2 />
                           </button>
                         )}
                       </div>
-                    ))}
+                      );
+                    })}
                   </div>
-                  <small className="admin-field-help">Add up to 5 images. The first image is used as the main storefront image.</small>
+                  <small className="admin-field-help">Choose images from your computer or paste URLs. The first image is used as the main storefront image.</small>
                 </fieldset>
 
                 <label className="admin-check admin-variant-active">
@@ -1982,11 +2113,11 @@ function ProductFormModal({
         {error && <p className="admin-form-error text-error">{error}</p>}
 
         <div className="admin-modal-actions">
-          <button type="button" className="secondary" onClick={onClose} disabled={saving}>
+          <button type="button" className="secondary" onClick={onClose} disabled={isBusy}>
             Cancel
           </button>
-          <button type="submit" className="primary" disabled={saving}>
-            {saving ? "Saving..." : mode === "edit" ? "Save Changes" : "Create Product"}
+          <button type="submit" className="primary" disabled={isBusy}>
+            {saving ? "Saving..." : uploadingImageKey ? "Uploading image..." : mode === "edit" ? "Save Changes" : "Create Product"}
           </button>
         </div>
       </form>
@@ -2004,6 +2135,7 @@ function ProductsPage() {
   const [form, setForm] = useState(createBlankProductForm);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState("");
+  const [uploadingImageKey, setUploadingImageKey] = useState("");
 
   const fetchProducts = useCallback(async () => {
     setLoading(true);
@@ -2104,7 +2236,7 @@ function ProductsPage() {
   };
 
   const closeModal = () => {
-    if (saving) return;
+    if (saving || uploadingImageKey) return;
 
     setModalMode(null);
     setEditingProduct(null);
@@ -2175,6 +2307,24 @@ function ProductsPage() {
         };
       }),
     }));
+  };
+
+  const uploadVariantImage = async (variantIndex, imageIndex, file) => {
+    if (!file) return;
+
+    const uploadKey = `${variantIndex}-${imageIndex}`;
+    setFormError("");
+    setUploadingImageKey(uploadKey);
+
+    try {
+      const { publicUrl } = await uploadSiteAssetImage(file, PRODUCT_ASSETS_FOLDER);
+      handleVariantImageChange(variantIndex, imageIndex, publicUrl);
+    } catch (error) {
+      console.error("Product image upload error:", error);
+      setFormError(error.message || "We could not upload that product image.");
+    } finally {
+      setUploadingImageKey("");
+    }
   };
 
   const addVariantImage = (variantIndex) => {
@@ -2458,14 +2608,182 @@ function ProductsPage() {
           onRemoveCategory={removeCategory}
           onVariantChange={handleVariantChange}
           onVariantImageChange={handleVariantImageChange}
+          onVariantImageUpload={uploadVariantImage}
           onAddVariantImage={addVariantImage}
           onRemoveVariantImage={removeVariantImage}
           onAddVariant={addVariant}
           onRemoveVariant={removeVariant}
           onSubmit={saveProduct}
+          uploadingImageKey={uploadingImageKey}
           saving={saving}
           error={formError}
         />
+      )}
+    </>
+  );
+}
+
+function GalleryAdminPage() {
+  const [images, setImages] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [uploading, setUploading] = useState(false);
+  const [deletingPath, setDeletingPath] = useState("");
+  const [error, setError] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
+
+  const fetchGalleryImages = useCallback(async () => {
+    setLoading(true);
+    setError("");
+
+    try {
+      const { data, error: listError } = await withRequestTimeout(supabase.storage
+        .from(SITE_ASSETS_BUCKET)
+        .list(GALLERY_ASSETS_FOLDER, {
+          limit: 100,
+          sortBy: {
+            column: "created_at",
+            order: "desc",
+          },
+        }));
+
+      if (listError) throw listError;
+
+      const galleryImages = (data || [])
+        .filter((file) => file.name && isSiteAssetImageName(file.name))
+        .map((file) => {
+          const path = `${GALLERY_ASSETS_FOLDER}/${file.name}`;
+          const { data: publicUrlData } = supabase.storage
+            .from(SITE_ASSETS_BUCKET)
+            .getPublicUrl(path);
+
+          return {
+            id: file.id || path,
+            name: file.name,
+            path,
+            url: publicUrlData.publicUrl,
+            createdAt: file.created_at,
+          };
+        });
+
+      setImages(galleryImages);
+    } catch (error) {
+      console.error("Admin gallery fetch error:", error);
+      setError(
+        isTimeoutError(error)
+          ? "Gallery images are taking too long to load. Please refresh in a moment."
+          : error.message || "We could not load gallery images."
+      );
+      setImages([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchGalleryImages();
+  }, [fetchGalleryImages]);
+
+  const uploadGalleryImages = async (event) => {
+    const files = Array.from(event.target.files || []);
+    event.target.value = "";
+
+    if (files.length === 0) return;
+
+    setUploading(true);
+    setError("");
+    setSuccessMessage("");
+
+    try {
+      for (const file of files) {
+        await uploadSiteAssetImage(file, GALLERY_ASSETS_FOLDER);
+      }
+
+      await fetchGalleryImages();
+      setSuccessMessage(
+        files.length === 1
+          ? "Gallery image uploaded."
+          : `${files.length} gallery images uploaded.`
+      );
+    } catch (error) {
+      console.error("Gallery image upload error:", error);
+      setError(error.message || "We could not upload that gallery image.");
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const deleteGalleryImage = async (image) => {
+    const shouldDelete = window.confirm("Delete this image from the public gallery?");
+
+    if (!shouldDelete) return;
+
+    setDeletingPath(image.path);
+    setError("");
+    setSuccessMessage("");
+
+    const { error: deleteError } = await supabase.storage
+      .from(SITE_ASSETS_BUCKET)
+      .remove([image.path]);
+
+    if (deleteError) {
+      console.error("Gallery image delete error:", deleteError);
+      setError(deleteError.message);
+      setDeletingPath("");
+      return;
+    }
+
+    setImages((current) => current.filter((item) => item.path !== image.path));
+    setSuccessMessage("Gallery image deleted.");
+    setDeletingPath("");
+  };
+
+  return (
+    <>
+      <PageHeader
+        title="Gallery"
+        description="Upload and manage the images shown on the public gallery page."
+        action={
+          <label className={`admin-gallery-upload ${uploading ? "is-disabled" : ""}`}>
+            <input
+              type="file"
+              accept={SITE_ASSET_IMAGE_ACCEPT}
+              multiple
+              disabled={uploading}
+              onChange={uploadGalleryImages}
+            />
+            <LuUpload />
+            <span>{uploading ? "Uploading..." : "Upload Images"}</span>
+          </label>
+        }
+      />
+
+      {successMessage && <p className="admin-status-message admin-form-success">{successMessage}</p>}
+      {loading && <p className="admin-status-message">Loading gallery...</p>}
+      {!loading && error && <p className="admin-status-message text-error">{error}</p>}
+      {!loading && !error && images.length === 0 && (
+        <p className="admin-status-message">No gallery images found.</p>
+      )}
+
+      {!loading && images.length > 0 && (
+        <div className="admin-gallery-grid">
+          {images.map((image) => (
+            <article className="admin-gallery-card" key={image.path}>
+              <img src={image.url} alt="" loading="lazy" />
+              <div>
+                <p>{image.name}</p>
+                <button
+                  type="button"
+                  className="admin-gallery-delete"
+                  disabled={deletingPath === image.path || uploading}
+                  onClick={() => deleteGalleryImage(image)}
+                >
+                  <LuTrash2 />
+                  <span>{deletingPath === image.path ? "Deleting..." : "Delete"}</span>
+                </button>
+              </div>
+            </article>
+          ))}
+        </div>
       )}
     </>
   );
@@ -2521,6 +2839,7 @@ function Admin() {
           <Route path="users" element={<UsersPage />} />
           <Route path="reviews" element={<AdminReviewsPage />} />
           <Route path="products" element={<ProductsPage />} />
+          <Route path="gallery" element={<GalleryAdminPage />} />
         </Routes>
       </section>
     </main>
