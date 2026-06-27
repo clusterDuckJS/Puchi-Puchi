@@ -93,7 +93,37 @@ const PRODUCT_CATEGORY_OPTIONS = [
   "Keychains"
 ];
 
-const normalizeListValue = (value) => value.trim().replace(/\s+/g, " ");
+const normalizeListValue = (value = "") => String(value).trim().replace(/\s+/g, " ");
+const getCategoryKey = (category) => normalizeListValue(category).toLowerCase();
+
+const mergeCategoryOptions = (...categoryGroups) => {
+  const seen = new Set();
+
+  return categoryGroups
+    .flat()
+    .map(normalizeListValue)
+    .filter(Boolean)
+    .filter((category) => {
+      const key = getCategoryKey(category);
+
+      if (seen.has(key)) return false;
+
+      seen.add(key);
+      return true;
+    });
+};
+
+const hasCategory = (categories, category) => {
+  const key = getCategoryKey(category);
+
+  return Boolean(key) && categories.some((item) => getCategoryKey(item) === key);
+};
+
+const removeCategoryFromList = (categories, category) => {
+  const key = getCategoryKey(category);
+
+  return categories.filter((item) => getCategoryKey(item) !== key);
+};
 
 const getFileExtension = (fileName = "") => (
   fileName.split(".").pop()?.toLowerCase().replace(/[^a-z0-9]/g, "") || ""
@@ -1805,6 +1835,7 @@ function AdminReviewsPage() {
 function ProductFormModal({
   form,
   mode,
+  categoryOptions,
   onClose,
   onProductChange,
   onCategoryToggle,
@@ -1824,6 +1855,10 @@ function ProductFormModal({
   error,
 }) {
   const isBusy = saving || Boolean(uploadingImageKey);
+  const visibleCategoryOptions = useMemo(
+    () => mergeCategoryOptions(categoryOptions, form.categories),
+    [categoryOptions, form.categories]
+  );
 
   return (
     <div className="admin-modal-overlay" role="presentation">
@@ -1863,11 +1898,11 @@ function ProductFormModal({
               </summary>
 
               <div className="admin-category-menu">
-                {PRODUCT_CATEGORY_OPTIONS.map((category) => (
+                {visibleCategoryOptions.map((category) => (
                   <label className="admin-category-option" key={category}>
                     <input
                       type="checkbox"
-                      checked={form.categories.includes(category)}
+                      checked={hasCategory(form.categories, category)}
                       onChange={() => onCategoryToggle(category)}
                     />
                     <span>{category}</span>
@@ -2193,6 +2228,18 @@ function ProductsPage() {
     });
   }, [products, query]);
 
+  const categoryOptions = useMemo(() => (
+    mergeCategoryOptions(
+      PRODUCT_CATEGORY_OPTIONS,
+      products.flatMap((product) => (
+        mergeCategoryOptions(
+          parseListField(product.categories),
+          parseListField(product.category)
+        )
+      ))
+    )
+  ), [products]);
+
   const openAddModal = () => {
     setForm(createBlankProductForm());
     setEditingProduct(null);
@@ -2252,12 +2299,12 @@ function ProductsPage() {
 
   const toggleCategory = (category) => {
     setForm((current) => {
-      const exists = current.categories.includes(category);
+      const exists = hasCategory(current.categories, category);
 
       return {
         ...current,
         categories: exists
-          ? current.categories.filter((item) => item !== category)
+          ? removeCategoryFromList(current.categories, category)
           : [...current.categories, category],
       };
     });
@@ -2270,7 +2317,7 @@ function ProductsPage() {
 
     setForm((current) => ({
       ...current,
-      categories: current.categories.includes(category)
+      categories: hasCategory(current.categories, category)
         ? current.categories
         : [...current.categories, category],
       customCategory: "",
@@ -2280,7 +2327,7 @@ function ProductsPage() {
   const removeCategory = (category) => {
     setForm((current) => ({
       ...current,
-      categories: current.categories.filter((item) => item !== category),
+      categories: removeCategoryFromList(current.categories, category),
     }));
   };
 
@@ -2600,6 +2647,7 @@ function ProductsPage() {
         <ProductFormModal
           form={form}
           mode={modalMode}
+          categoryOptions={categoryOptions}
           onClose={closeModal}
           onProductChange={handleProductChange}
           onCategoryToggle={toggleCategory}
