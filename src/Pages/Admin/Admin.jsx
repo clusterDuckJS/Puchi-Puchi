@@ -13,6 +13,8 @@ import {
   LuListOrdered,
   LuLogOut,
   LuPackage,
+  LuPanelLeftClose,
+  LuPanelLeftOpen,
   LuPenLine,
   LuPlus,
   LuSearch,
@@ -28,13 +30,14 @@ import {
 import { NavLink, Route, Routes, useNavigate } from "react-router-dom";
 import {
   formatOrderNumber,
-  formatOrderStatus,
   formatShortDate,
   getCountdownLabel,
   getOrderDueDate,
+  getOrderTrackingCarrier,
   isMissingOrderNumberError,
   normalizeOrderStatus,
   ORDER_STAGE_OPTIONS,
+  ORDER_TRACKING_CARRIERS,
 } from "../../utils/orders";
 import { supabase } from "../../utils/supabase";
 import { isTimeoutError, withRequestTimeout } from "../../utils/request";
@@ -516,10 +519,6 @@ function RichTextEditor({ id, value, onChange }) {
   );
 }
 
-const getAdminOrderStatusValue = (status) => (
-  status === "ready_to_ship" || status === "shipped" ? "dispatched" : status || "paid"
-);
-
 const getAdminOrderRowClassName = (status) => {
   const normalizedStatus = normalizeOrderStatus(status);
 
@@ -537,6 +536,10 @@ const getAdminOrderRowClassName = (status) => {
 
   return "";
 };
+
+const getAdminOrderStatusValue = (status) => (
+  status === "ready_to_ship" || status === "shipped" ? "dispatched" : status || "paid"
+);
 
 const formatChoiceLabel = (value) => (
   String(value || "standard")
@@ -799,6 +802,8 @@ function OrdersPage() {
           status,
           paid_at,
           tracking_id,
+          tracking_notes,
+          tracking_carrier,
           dispatched_at,
           selected_address_id,
           delivery_address,
@@ -946,13 +951,15 @@ function OrdersPage() {
     }
   };
 
-  const updateOrderTracking = async (orderId, trackingId) => {
+  const updateOrderTracking = async (orderId, trackingDetails) => {
     setSavingTrackingId(orderId);
     setError("");
 
     try {
       const payload = {
-        tracking_id: trackingId.trim() || null,
+        tracking_id: trackingDetails.trackingId.trim() || null,
+        tracking_notes: trackingDetails.trackingNotes.trim() || null,
+        tracking_carrier: getOrderTrackingCarrier(trackingDetails.trackingCarrier).value,
       };
 
       const { error: updateError } = await supabase
@@ -967,7 +974,7 @@ function OrdersPage() {
       )));
     } catch (error) {
       console.error("Order tracking update error:", error);
-      setError("We could not update that tracking ID.");
+      setError("We could not update those tracking details.");
     } finally {
       setSavingTrackingId("");
     }
@@ -1009,6 +1016,8 @@ function OrdersPage() {
         customer.phone,
         order.status,
         order.tracking_id,
+        order.tracking_notes,
+        getOrderTrackingCarrier(order.tracking_carrier).label,
         order.delivery_address?.full_name,
         order.delivery_address?.phone,
         formatAddressLine(order.delivery_address),
@@ -1070,13 +1079,12 @@ function OrdersPage() {
           <thead>
             <tr>
               <th>Order ID</th>
-              <th>Customer</th>
-              <th>Delivery</th>
+              <th>Delivery Address</th>
               <th>Items</th>
               <th>Total</th>
               <th>Date</th>
               <th>Timeline</th>
-              <th>Status / Stage</th>
+              <th>Status</th>
               <th>Tracking</th>
             </tr>
           </thead>
@@ -1092,16 +1100,14 @@ function OrdersPage() {
               return (
                 <tr key={order.id} className={getAdminOrderRowClassName(order.status)}>
                   <td>#{formatOrderNumber(order)}</td>
-                  <td className="admin-customer-cell">
-                    <p>{customer.name}</p>
-                    <span>{customer.email}</span>
-                    <span>{customer.phone}</span>
-                  </td>
                   <td>
                     <div className="admin-order-items">
-                      <strong>{address.full_name || "Address not saved"}</strong>
+                      <div className="admin-order-contact">
+                        <strong>{customer.name}</strong>
+                        <span>{customer.email}</span>
+                      </div>
+                      <strong>{formatAddressLine(address) || "Address not saved"}</strong>
                       {address.phone && <span>{address.phone}</span>}
-                      {formatAddressLine(address) && <span>{formatAddressLine(address)}</span>}
                       <em>
                         Shipping: {formatChoiceLabel(order.shipping_method)}
                         {order.shipping_amount ? ` (${currency.format(order.shipping_amount / 100)})` : ""}
@@ -1154,9 +1160,6 @@ function OrdersPage() {
                     </span>
                   </td>
                   <td className="admin-order-stage-cell">
-                    <span className={`admin-status ${order.status !== "delivered" ? "accent" : ""}`}>
-                      {formatOrderStatus(order.status)}
-                    </span>
                     <select
                       value={getAdminOrderStatusValue(order.status)}
                       onChange={(event) => updateOrderStatus(order.id, event.target.value)}
@@ -1173,7 +1176,11 @@ function OrdersPage() {
                       className="admin-tracking-form"
                       onSubmit={(event) => {
                         event.preventDefault();
-                        updateOrderTracking(order.id, event.currentTarget.elements.trackingId.value);
+                        updateOrderTracking(order.id, {
+                          trackingId: event.currentTarget.elements.trackingId.value,
+                          trackingNotes: event.currentTarget.elements.trackingNotes.value,
+                          trackingCarrier: event.currentTarget.elements.trackingCarrier.value,
+                        });
                       }}
                     >
                       <input
@@ -1183,6 +1190,21 @@ function OrdersPage() {
                         placeholder="Tracking ID"
                         aria-label={`${order.id} tracking ID`}
                       />
+                      <textarea
+                        name="trackingNotes"
+                        defaultValue={order.tracking_notes || ""}
+                        placeholder="Delay notes or delivery updates"
+                        aria-label={`${order.id} tracking notes`}
+                      />
+                      <select
+                        name="trackingCarrier"
+                        defaultValue={getOrderTrackingCarrier(order.tracking_carrier).value}
+                        aria-label={`${order.id} tracking carrier`}
+                      >
+                        {ORDER_TRACKING_CARRIERS.map((carrier) => (
+                          <option value={carrier.value} key={carrier.value}>{carrier.label}</option>
+                        ))}
+                      </select>
                       <button type="submit" disabled={savingTrackingId === order.id}>
                         Save
                       </button>
@@ -2839,6 +2861,7 @@ function GalleryAdminPage() {
 
 function Admin() {
   const navigate = useNavigate();
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
   const handleLogout = async () => {
     const { error } = await supabase.auth.signOut();
@@ -2849,11 +2872,22 @@ function Admin() {
   };
 
   return (
-    <main className="admin-shell">
-      <aside className="admin-sidebar">
+    <main className={`admin-shell ${isSidebarCollapsed ? "admin-shell-sidebar-collapsed" : ""}`}>
+      <aside className={`admin-sidebar ${isSidebarCollapsed ? "is-collapsed" : ""}`}>
         <div className="admin-sidebar-heading">
-          <h1>Puchi Admin</h1>
-          <p>Internal dashboard</p>
+          <div className="admin-sidebar-brand">
+            <h1>Puchi Admin</h1>
+            <p>Internal dashboard</p>
+          </div>
+          <button
+            className="admin-sidebar-toggle"
+            type="button"
+            onClick={() => setIsSidebarCollapsed((value) => !value)}
+            aria-label={isSidebarCollapsed ? "Expand side panel" : "Collapse side panel"}
+            title={isSidebarCollapsed ? "Expand side panel" : "Collapse side panel"}
+          >
+            {isSidebarCollapsed ? <LuPanelLeftOpen /> : <LuPanelLeftClose />}
+          </button>
         </div>
 
         <nav className="admin-nav" aria-label="Admin navigation">
@@ -2866,6 +2900,7 @@ function Admin() {
                 end={item.end}
                 key={item.to}
                 to={item.to}
+                title={isSidebarCollapsed ? item.label : undefined}
               >
                 <Icon />
                 <span>{item.label}</span>
@@ -2874,7 +2909,12 @@ function Admin() {
           })}
         </nav>
 
-        <button className="admin-logout" type="button" onClick={handleLogout}>
+        <button
+          className="admin-logout"
+          type="button"
+          onClick={handleLogout}
+          title={isSidebarCollapsed ? "Log out" : undefined}
+        >
           <LuLogOut />
           <span>Log out</span>
         </button>

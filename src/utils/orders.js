@@ -10,6 +10,28 @@ export const ORDER_STAGE_OPTIONS = [
   { value: "cancelled", label: "Order Cancelled" },
 ];
 
+export const ORDER_TRACKING_CARRIERS = [
+  {
+    value: "india_post",
+    label: "India Post",
+    trackingUrl: "https://www.indiapost.gov.in/",
+    displayUrl: "indiapost.gov.in",
+  },
+  {
+    value: "ekart",
+    label: "Ekart",
+    trackingUrl: "https://www.ekartlogistics.in/track-order",
+    displayUrl: "ekartlogistics.in/track-order",
+  },
+];
+
+export const getOrderTrackingCarrier = (carrier) => {
+  const normalizedCarrier = String(carrier || "india_post").trim().toLowerCase();
+
+  return ORDER_TRACKING_CARRIERS.find((option) => option.value === normalizedCarrier) ||
+    ORDER_TRACKING_CARRIERS[0];
+};
+
 export const ORDER_STAGE_INDEX = ORDER_STAGE_OPTIONS.reduce((map, stage, index) => ({
   ...map,
   [stage.value]: index,
@@ -61,6 +83,21 @@ export const isMissingOrderNumberError = (error) => {
 
   return errorText.includes("order_number");
 };
+
+const isMissingSchemaColumnError = (error, columnNames) => {
+  const errorText = [
+    error?.code,
+    error?.message,
+    error?.details,
+    error?.hint,
+  ].filter(Boolean).join(" ").toLowerCase();
+
+  return columnNames.some((columnName) => errorText.includes(columnName.toLowerCase()));
+};
+
+export const isMissingOrderTrackingDetailsError = (error) => (
+  isMissingSchemaColumnError(error, ["tracking_notes", "tracking_carrier"])
+);
 
 const isWorkingDay = (date) => {
   const day = date.getDay();

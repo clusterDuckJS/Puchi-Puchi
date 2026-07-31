@@ -25,7 +25,9 @@ import {
   formatShortDate,
   getCountdownLabel,
   getOrderStageIndex,
+  getOrderTrackingCarrier,
   isMissingOrderNumberError,
+  isMissingOrderTrackingDetailsError,
   ORDER_STAGE_OPTIONS,
 } from "../../utils/orders";
 import { isTimeoutError, withRequestTimeout } from "../../utils/request";
@@ -81,7 +83,7 @@ function OrderProgress({ order }) {
         const isDone = !isCancelled && index <= stageIndex;
 
         return (
-          <div className="profile-progress-step" key={step.key}>
+          <div className="profile-progress-step" key={step.value}>
             <span className={isDone ? "complete" : ""}>
               <Icon />
             </span>
@@ -97,6 +99,9 @@ function OrderProgress({ order }) {
 }
 
 function OrderTimelineMeta({ order }) {
+  const trackingCarrier = getOrderTrackingCarrier(order.tracking_carrier);
+  const trackingNotes = String(order.tracking_notes || "").trim();
+
   return (
     <div className="profile-order-timeline-meta">
       <span>{getCountdownLabel(order)}</span>
@@ -106,13 +111,19 @@ function OrderTimelineMeta({ order }) {
             Tracking ID: <strong>{order.tracking_id}</strong>
           </span>
           <p className="profile-tracking-note">
-            Sent via India Post. Track it at{" "}
-            <a href="https://www.indiapost.gov.in/" target="_blank" rel="noreferrer">
-              indiapost.gov.in
+            Sent via {trackingCarrier.label}. Track it at{" "}
+            <a href={trackingCarrier.trackingUrl} target="_blank" rel="noreferrer">
+              {trackingCarrier.displayUrl}
             </a>
             . Tracking can take up to 24 hours to become active.
           </p>
         </>
+      )}
+      {trackingNotes && (
+        <div className="profile-order-update">
+          <strong>Puchi update</strong>
+          <p>{trackingNotes}</p>
+        </div>
       )}
       {order.dispatched_at && (
         <span>Dispatched {formatShortDate(order.dispatched_at)}</span>
@@ -163,6 +174,8 @@ function OrdersTab({ orders, loading, error }) {
               const product = item.products || {};
               const variant = item.product_variants || {};
               const customUpload = item.custom_uploads?.[0];
+              const customUploadStatus = customUpload?.status ? formatOrderStatus(customUpload.status) : "";
+              const customUploadNotes = String(customUpload?.notes || "").trim();
               const image = parseCartListField(variant.image_urls || variant.image_url)[0] || PRODUCT_PLACEHOLDER_IMAGE;
               const itemTotal = (item.quantity || 0) * (item.price || 0);
 
@@ -186,6 +199,12 @@ function OrdersTab({ orders, loading, error }) {
                           {customUpload.custom_text_type === "name_plate" ? "Name plate" : "Name"}: {customUpload.base_text}
                           {customUpload.base_fee ? ` (+${formatCartPrice(customUpload.base_fee)})` : ""}
                         </small>
+                      )}
+                      {(customUploadStatus || customUploadNotes) && (
+                        <div className="profile-custom-update">
+                          {customUploadStatus && <strong>Custom request: {customUploadStatus}</strong>}
+                          {customUploadNotes && <span>{customUploadNotes}</span>}
+                        </div>
                       )}
                     </div>
                     <strong>{formatCartPrice(itemTotal)}</strong>
@@ -451,7 +470,7 @@ function Profile({ user, profile, onProfileUpdated }) {
     setOrdersError("");
 
     try {
-      const createOrdersRequest = (includeOrderNumber) => supabase
+      const createOrdersRequest = ({ includeOrderNumber, includeTrackingDetails }) => supabase
         .from("orders")
         .select(`
           id,
@@ -460,6 +479,7 @@ function Profile({ user, profile, onProfileUpdated }) {
           status,
           paid_at,
           tracking_id,
+          ${includeTrackingDetails ? "tracking_notes, tracking_carrier," : ""}
           dispatched_at,
           created_at,
           order_items (
@@ -487,10 +507,29 @@ function Profile({ user, profile, onProfileUpdated }) {
         .neq("status", "pending")
         .order("created_at", { ascending: false });
 
-      let ordersResult = await withRequestTimeout(createOrdersRequest(true));
+      let includeOrderNumber = true;
+      let includeTrackingDetails = true;
+      let ordersResult = null;
 
-      if (ordersResult.error && isMissingOrderNumberError(ordersResult.error)) {
-        ordersResult = await withRequestTimeout(createOrdersRequest(false));
+      for (let attempt = 0; attempt < 3; attempt += 1) {
+        ordersResult = await withRequestTimeout(createOrdersRequest({
+          includeOrderNumber,
+          includeTrackingDetails,
+        }));
+
+        if (!ordersResult.error) break;
+
+        if (includeOrderNumber && isMissingOrderNumberError(ordersResult.error)) {
+          includeOrderNumber = false;
+          continue;
+        }
+
+        if (includeTrackingDetails && isMissingOrderTrackingDetailsError(ordersResult.error)) {
+          includeTrackingDetails = false;
+          continue;
+        }
+
+        break;
       }
 
       const { data, error } = ordersResult;
