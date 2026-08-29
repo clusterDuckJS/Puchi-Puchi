@@ -44,6 +44,7 @@ import { supabase } from "../../utils/supabase";
 import { isTimeoutError, withRequestTimeout } from "../../utils/request";
 import { sanitizeRichText, stripRichText } from "../../utils/richText";
 import { convertImageToWebp } from "../../utils/images";
+import { deleteReviewImage, uploadReviewImage } from "../../utils/reviews";
 import "./admin.css";
 
 const currency = new Intl.NumberFormat("en-IN", {
@@ -1483,6 +1484,7 @@ function UsersPage() {
 }
 
 function AdminReviewsPage() {
+  const reviewImageInputRef = useRef(null);
   const [reviews, setReviews] = useState([]);
   const [form, setForm] = useState(createBlankAdminReviewForm);
   const [replyDrafts, setReplyDrafts] = useState({});
@@ -1494,6 +1496,12 @@ function AdminReviewsPage() {
   const [savingReplyId, setSavingReplyId] = useState("");
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
+  const [reviewImageFile, setReviewImageFile] = useState(null);
+  const [reviewImagePreview, setReviewImagePreview] = useState("");
+
+  useEffect(() => () => {
+    if (reviewImagePreview) URL.revokeObjectURL(reviewImagePreview);
+  }, [reviewImagePreview]);
 
   const fetchReviews = useCallback(async () => {
     setLoading(true);
@@ -1616,6 +1624,43 @@ function AdminReviewsPage() {
     setIsProductMenuOpen(false);
   };
 
+  const clearReviewImage = () => {
+    if (reviewImagePreview) URL.revokeObjectURL(reviewImagePreview);
+    setReviewImageFile(null);
+    setReviewImagePreview("");
+
+    if (reviewImageInputRef.current) {
+      reviewImageInputRef.current.value = "";
+    }
+  };
+
+  const handleReviewImageChange = (event) => {
+    const file = event.target.files?.[0];
+    setError("");
+    setMessage("");
+
+    if (!file) {
+      clearReviewImage();
+      return;
+    }
+
+    if (!file.type.startsWith("image/")) {
+      clearReviewImage();
+      setError("Please choose an image file.");
+      return;
+    }
+
+    if (file.size > 10 * 1024 * 1024) {
+      clearReviewImage();
+      setError("Review images must be 10MB or smaller.");
+      return;
+    }
+
+    if (reviewImagePreview) URL.revokeObjectURL(reviewImagePreview);
+    setReviewImageFile(file);
+    setReviewImagePreview(URL.createObjectURL(file));
+  };
+
   const saveReview = async (event) => {
     event.preventDefault();
     setSaving(true);
@@ -1647,17 +1692,45 @@ function AdminReviewsPage() {
       return;
     }
 
-    const { error } = await supabase
-      .from("reviews")
-      .insert(payload);
+    let uploadedImagePath = "";
 
-    if (error) {
-      setError(error.message);
+    try {
+      if (reviewImageFile) {
+        const { data: authData, error: authError } = await supabase.auth.getUser();
+
+        if (authError || !authData.user) {
+          throw new Error("Please log in again before uploading a review image.");
+        }
+
+        const uploadedImage = await uploadReviewImage({
+          file: reviewImageFile,
+          userId: authData.user.id,
+        });
+        uploadedImagePath = uploadedImage.path;
+        payload.review_image_url = uploadedImage.publicUrl;
+      }
+
+      const { error } = await supabase
+        .from("reviews")
+        .insert(payload);
+
+      if (error) throw error;
+    } catch (error) {
+      if (uploadedImagePath) {
+        try {
+          await deleteReviewImage(uploadedImagePath);
+        } catch (cleanupError) {
+          console.error("Admin review image cleanup error:", cleanupError);
+        }
+      }
+
+      setError(error.message || "We could not save that review.");
       setSaving(false);
       return;
     }
 
     setForm(createBlankAdminReviewForm());
+    clearReviewImage();
     setMessage("Review saved.");
     setSaving(false);
     await fetchReviews();
@@ -1901,6 +1974,29 @@ function AdminReviewsPage() {
                 required
               />
             </label>
+            <label className="admin-file-upload-button admin-review-image-upload">
+              <input
+                ref={reviewImageInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleReviewImageChange}
+              />
+              <LuUpload />
+              <span>Add review photo</span>
+            </label>
+            <small className="admin-field-help admin-form-wide">Optional. Uploaded photos are converted to WebP and must be 10MB or smaller.</small>
+            {reviewImagePreview && (
+              <div className="admin-review-image-preview admin-form-wide">
+                <img src={reviewImagePreview} alt="Review upload preview" />
+                <div>
+                  <strong>{reviewImageFile?.name}</strong>
+                  <span>Will be saved as WebP</span>
+                </div>
+                <button type="button" onClick={clearReviewImage} aria-label="Remove review image">
+                  <LuX />
+                </button>
+              </div>
+            )}
             <label className="admin-check admin-form-wide">
               <input
                 type="checkbox"

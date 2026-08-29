@@ -1349,6 +1349,55 @@
   display: flex;
 }
 
+.admin-review-image-upload {
+  width: fit-content;
+}
+
+.admin-review-image-preview {
+  display: grid;
+  grid-template-columns: 4.5rem minmax(0, 1fr) 2.5rem;
+  align-items: center;
+  gap: 0.8rem;
+  padding: 0.7rem;
+  border: 1px solid rgb(221 95 137 / 18%);
+  border-radius: 0.85rem;
+  background: #fff5f8;
+}
+
+.admin-review-image-preview img {
+  width: 4.5rem;
+  aspect-ratio: 1;
+  border-radius: 0.7rem;
+  object-fit: cover;
+}
+
+.admin-review-image-preview div {
+  display: grid;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.admin-review-image-preview strong {
+  overflow: hidden;
+  color: #352026;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-review-image-preview span {
+  color: rgb(83 45 51 / 62%);
+  font-size: 0.8rem;
+}
+
+.admin-review-image-preview button {
+  width: 2.5rem;
+  height: 2.5rem;
+  padding: 0;
+  border: 1px solid rgb(221 95 137 / 18%);
+  background: #fffdf9;
+  color: var(--color-error);
+}
+
 .admin-review-list-panel {
   min-width: 0;
 }
