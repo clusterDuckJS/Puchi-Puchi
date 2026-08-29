@@ -130,7 +130,7 @@ function Home() {
             <ProductCard
               key={product.id}
               product={product}
-              onClick={(p) => navigate(`/product/${p.id}`)}
+              onClick={(p) => navigate(`/product/${p.slug || p.id}`)}
             />
           ))}
         </div>
@@ -146,7 +146,7 @@ function Home() {
             <ProductCard
               key={product.id}
               product={product}
-              onClick={(p) => navigate(`/product/${p.id}`)}
+              onClick={(p) => navigate(`/product/${p.slug || p.id}`)}
             />
           ))}
         </div>

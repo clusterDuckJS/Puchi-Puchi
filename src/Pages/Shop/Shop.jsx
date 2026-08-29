@@ -199,7 +199,7 @@ function Shop() {
                   categories: getProductCategories(product).map(formatCategory),
                   category: formatCategory(getProductCategories(product)[0] || product.category),
                 }}
-                onClick={(selectedProduct) => navigate(`/product/${selectedProduct.id}`)}
+                onClick={(selectedProduct) => navigate(`/product/${selectedProduct.slug || selectedProduct.id}`)}
               />
             ))}
           </div>

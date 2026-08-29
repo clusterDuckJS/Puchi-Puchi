@@ -64,7 +64,7 @@ function ProductCard({ product, onClick }) {
 
       {product.id ? (
         <NavLink
-          to={`/product/${product.id}`}
+        to={`/product/${product.slug || product.id}`}
           onClick={(event) => event.stopPropagation()}
           className="secondary mt-1 product-card-link"
         >

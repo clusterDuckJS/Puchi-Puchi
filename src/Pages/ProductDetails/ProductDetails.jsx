@@ -12,6 +12,7 @@ import { deleteReviewImage, uploadReviewImage } from '../../utils/reviews'
 const CUSTOM_IMAGE_MAX_BYTES = 15 * 1024 * 1024
 const CUSTOM_BASE_TEXT_MAX_LENGTH = 40
 const PRODUCT_PLACEHOLDER_IMAGE = "/product-placeholder.svg"
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
 const parseListField = (value) => {
   if (Array.isArray(value)) return value.map(String).filter(Boolean)
@@ -262,7 +263,7 @@ function ProductReviews({ productId, productName }) {
 }
 
 function ProductDetails() {
-  const { id } = useParams()
+  const { productKey } = useParams()
   const navigate = useNavigate()
   const customImageInputRef = useRef(null)
   const [product, setProduct] = useState(null)
@@ -286,7 +287,7 @@ function ProductDetails() {
     let isCurrent = true
 
     const fetchProduct = async () => {
-      if (!id) {
+      if (!productKey) {
         setProduct(false)
         setLoading(false)
         return
@@ -297,7 +298,7 @@ function ProductDetails() {
       setProductError("")
 
       try {
-        const { data, error } = await withRequestTimeout(supabase
+        let query = supabase
           .from("products")
           .select(`
             *,
@@ -305,8 +306,12 @@ function ProductDetails() {
               *
             )
           `)
-          .eq("id", id)
-          .single())
+
+        query = UUID_PATTERN.test(productKey)
+          ? query.eq("id", productKey)
+          : query.eq("slug", productKey)
+
+        const { data, error } = await withRequestTimeout(query.single())
 
         if (!isCurrent) return
 
@@ -336,7 +341,18 @@ function ProductDetails() {
     return () => {
       isCurrent = false
     }
-  }, [id])
+  }, [productKey])
+
+  useEffect(() => {
+    if (!product?.name) return undefined
+
+    const previousTitle = document.title
+    document.title = `${product.name} | Puchi Puchi`
+
+    return () => {
+      document.title = previousTitle
+    }
+  }, [product?.name])
 
   useEffect(() => {
     return () => {
@@ -375,7 +391,7 @@ function ProductDetails() {
             )
           `)
           .eq("is_active", true)
-          .neq("id", id)
+          .neq("id", product?.id || "")
           .limit(3))
 
         if (!isCurrent) return
@@ -398,7 +414,7 @@ function ProductDetails() {
     return () => {
       isCurrent = false
     }
-  }, [id])
+  }, [product?.id])
 
   if (loading) {
     return (
@@ -881,7 +897,7 @@ function ProductDetails() {
                 <ProductCard
                   key={item.id}
                   product={item}
-                  onClick={(selectedProduct) => navigate(`/product/${selectedProduct.id}`)}
+                  onClick={(selectedProduct) => navigate(`/product/${selectedProduct.slug || selectedProduct.id}`)}
                 />
               ))}
             </div>
