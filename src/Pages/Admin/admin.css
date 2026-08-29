@@ -1475,6 +1475,19 @@
   line-height: 1.55;
 }
 
+.admin-review-image {
+  display: block;
+  width: fit-content;
+}
+
+.admin-review-image img {
+  display: block;
+  width: min(100%, 16rem);
+  max-height: 16rem;
+  border-radius: 0.75rem;
+  object-fit: cover;
+}
+
 .admin-review-reply {
   display: grid;
   gap: 0.55rem;

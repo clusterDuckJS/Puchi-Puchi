@@ -2,6 +2,7 @@ import { supabase } from "./supabase"
 
 export const CART_UPDATED_EVENT = "puchi-cart-updated"
 export const CUSTOM_BASE_FEE = 10000
+export const GIFT_BOX_FEE = 15000
 
 export const formatCartPrice = (amount = 0) =>
   `\u20b9${((amount || 0) / 100).toLocaleString("en-IN")}`
@@ -145,6 +146,7 @@ export const addItemToCart = async ({
   customBaseText = "",
   customBaseFee = 0,
   customTextType = null,
+  addProductBox = false,
 }) => {
   if (!userId) {
     throw new Error("Please log in before adding items to your cart.")
@@ -165,13 +167,13 @@ export const addItemToCart = async ({
 
   const hasCustomUpload = Boolean(customImageUrl)
   const normalizedBaseText = customBaseText.trim().slice(0, 40)
-  const baseFee = normalizedBaseText ? Number(customBaseFee) || 0 : 0
+  const baseFee = (normalizedBaseText ? Number(customBaseFee) || 0 : 0) + (addProductBox ? GIFT_BOX_FEE : 0)
   const normalizedTextType = normalizedBaseText && customTextType === "name_plate" ? "name_plate" : (normalizedBaseText ? "name" : null)
   const itemPrice = price + baseFee
 
   let cartItem = null
 
-  if (!hasCustomUpload && !normalizedBaseText) {
+  if (!hasCustomUpload && !normalizedBaseText && !addProductBox) {
     const { data: existingItem, error: itemError } = await supabase
       .from("order_items")
       .select("id, quantity")
@@ -218,7 +220,7 @@ export const addItemToCart = async ({
     cartItem = data
   }
 
-  if (hasCustomUpload || normalizedBaseText) {
+  if (hasCustomUpload || normalizedBaseText || addProductBox) {
     const { error } = await supabase
       .from("custom_uploads")
       .insert({
@@ -227,6 +229,7 @@ export const addItemToCart = async ({
         base_text: normalizedBaseText || null,
         base_fee: baseFee,
         custom_text_type: normalizedTextType,
+        product_box: addProductBox,
         status: "pending",
       })
 
@@ -330,6 +333,7 @@ export const fetchCart = async (userId) => {
         base_text,
         base_fee,
         custom_text_type,
+        product_box,
         status,
         notes
       )

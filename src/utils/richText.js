@@ -1,4 +1,4 @@
-const ALLOWED_TAGS = new Set(["B", "BR", "DIV", "EM", "I", "LI", "OL", "P", "STRONG", "U", "UL"]);
+const ALLOWED_TAGS = new Set(["B", "BR", "DIV", "EM", "I", "IMG", "LI", "OL", "P", "STRONG", "U", "UL"]);
 const BLOCK_TAGS = new Set(["DIV", "P"]);
 const DROPPED_TAGS = new Set(["SCRIPT", "STYLE"]);
 
@@ -10,6 +10,12 @@ const escapeHtml = (value) => String(value)
   .replace(/'/g, "&#039;");
 
 const hasHtmlTags = (value) => /<\/?[a-z][\s\S]*>/i.test(String(value || ""));
+
+const isSafeImageSource = (value) => {
+  const source = String(value || "").trim();
+
+  return source.startsWith("/") || /^https:\/\//i.test(source);
+};
 
 const textToHtml = (value) => String(value || "")
   .split(/\n{2,}/)
@@ -41,6 +47,18 @@ const sanitizeNode = (node, document) => {
 
   const tagName = BLOCK_TAGS.has(node.tagName) ? "p" : node.tagName.toLowerCase();
   const element = document.createElement(tagName);
+
+  if (node.tagName === "IMG") {
+    const source = node.getAttribute("src");
+
+    if (isSafeImageSource(source)) {
+      element.setAttribute("src", source);
+      element.setAttribute("alt", node.getAttribute("alt") || "");
+    } else {
+      return document.createTextNode("");
+    }
+  }
+
   node.childNodes.forEach((child) => {
     element.appendChild(sanitizeNode(child, document));
   });

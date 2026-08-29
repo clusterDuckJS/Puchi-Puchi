@@ -7,7 +7,6 @@ import { supabase } from './utils/supabase';
 const Home = lazy(() => import('./Pages/Home/Home'));
 const Shop = lazy(() => import('./Pages/Shop/Shop'));
 const About = lazy(() => import('./Pages/About/About'));
-const Reviews = lazy(() => import('./Pages/Reviews/Reviews'));
 const Faq = lazy(() => import('./Pages/Faq/Faq'));
 const Gallery = lazy(() => import('./Pages/Gallery/Gallery'));
 const ProductDetails = lazy(() => import('./Pages/ProductDetails/ProductDetails'));
@@ -211,8 +210,7 @@ function App() {
           <Route path="/shop" element={<Shop />} />
           <Route path="/cart" element={<Cart />} />
           <Route path="/payment-status" element={<PaymentStatus />} />
-          <Route path="/reviews" element={<Reviews />} />
-          <Route path="/reviews/new" element={<Reviews />} />
+          <Route path="/reviews/*" element={<Navigate to="/shop" replace />} />
           <Route path="/gallery" element={<Gallery />} />
           <Route path="/faq" element={<Faq />} />
           <Route

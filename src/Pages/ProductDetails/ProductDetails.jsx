@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
 import './product-details.css'
 import { NavLink, useNavigate, useParams } from 'react-router-dom'
-import { LuArrowLeft, LuHeart, LuImagePlus, LuMinus, LuPlus, LuSearch, LuShoppingBag, LuX } from 'react-icons/lu'
+import { LuArrowLeft, LuHeart, LuImagePlus, LuMinus, LuPlus, LuSearch, LuSend, LuShoppingBag, LuStar, LuX } from 'react-icons/lu'
 import { supabase } from '../../utils/supabase'
 import ProductCard from '../../Components/ProductCard/ProductCard'
-import { addItemToCart, CUSTOM_BASE_FEE, formatCartPrice, getCurrentUserId, uploadCustomOrderImage } from '../../utils/cart'
+import { addItemToCart, CUSTOM_BASE_FEE, formatCartPrice, getCurrentUserId, GIFT_BOX_FEE, uploadCustomOrderImage } from '../../utils/cart'
 import { isTimeoutError, withRequestTimeout } from '../../utils/request'
 import { sanitizeRichText } from '../../utils/richText'
+import { deleteReviewImage, uploadReviewImage } from '../../utils/reviews'
 
 const CUSTOM_IMAGE_MAX_BYTES = 15 * 1024 * 1024
 const CUSTOM_BASE_TEXT_MAX_LENGTH = 40
@@ -16,6 +17,248 @@ const parseListField = (value) => {
   if (Array.isArray(value)) return value.map(String).filter(Boolean)
   if (!value) return []
   return String(value).split(',').map((item) => item.trim()).filter(Boolean)
+}
+
+const createBlankReviewForm = () => ({
+  reviewer_first_name: "",
+  place: "",
+  rating: "5",
+  review_text: "",
+})
+
+const formatReviewDate = (value) => value && new Intl.DateTimeFormat("en-IN", {
+  day: "numeric",
+  month: "short",
+  year: "numeric",
+}).format(new Date(value))
+
+const StarRating = ({ rating }) => (
+  <div className="product-review-stars" aria-label={`${rating} out of 5 stars`}>
+    {[1, 2, 3, 4, 5].map((star) => <LuStar className={star <= rating ? "filled" : ""} key={star} />)}
+  </div>
+)
+
+function ProductReviews({ productId, productName }) {
+  const reviewImageInputRef = useRef(null)
+  const [reviews, setReviews] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [errorMessage, setErrorMessage] = useState("")
+  const [form, setForm] = useState(createBlankReviewForm)
+  const [formStatus, setFormStatus] = useState("")
+  const [formError, setFormError] = useState("")
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [reviewImageFile, setReviewImageFile] = useState(null)
+  const [reviewImagePreview, setReviewImagePreview] = useState("")
+
+  useEffect(() => () => {
+    if (reviewImagePreview) URL.revokeObjectURL(reviewImagePreview)
+  }, [reviewImagePreview])
+
+  useEffect(() => {
+    let isCurrent = true
+
+    const fetchReviews = async () => {
+      setLoading(true)
+      setErrorMessage("")
+
+      try {
+        const { data, error } = await withRequestTimeout(supabase
+          .from("reviews")
+          .select("*")
+          .eq("product_id", productId)
+          .eq("is_approved", true)
+          .order("review_date", { ascending: false })
+          .order("created_at", { ascending: false }))
+
+        if (error) throw error
+        if (isCurrent) setReviews(data || [])
+      } catch (error) {
+        if (isCurrent) {
+          console.error("Product reviews load error:", error)
+          setErrorMessage(isTimeoutError(error)
+            ? "Reviews are taking too long to load. Please refresh in a moment."
+            : "We could not load reviews right now.")
+        }
+      } finally {
+        if (isCurrent) setLoading(false)
+      }
+    }
+
+    fetchReviews()
+    return () => { isCurrent = false }
+  }, [productId])
+
+  const averageRating = reviews.length
+    ? reviews.reduce((total, review) => total + Number(review.rating || 0), 0) / reviews.length
+    : 0
+
+  const handleFormChange = (field, value) => {
+    setFormStatus("")
+    setFormError("")
+    setForm((current) => ({ ...current, [field]: value }))
+  }
+
+  const clearReviewImage = () => {
+    if (reviewImagePreview) URL.revokeObjectURL(reviewImagePreview)
+    setReviewImageFile(null)
+    setReviewImagePreview("")
+    if (reviewImageInputRef.current) reviewImageInputRef.current.value = ""
+  }
+
+  const handleReviewImageChange = (event) => {
+    const file = event.target.files?.[0]
+    setFormStatus("")
+    setFormError("")
+
+    if (!file) {
+      clearReviewImage()
+      return
+    }
+
+    if (!file.type.startsWith("image/")) {
+      clearReviewImage()
+      setFormError("Please choose an image file.")
+      return
+    }
+
+    if (file.size > 10 * 1024 * 1024) {
+      clearReviewImage()
+      setFormError("Review images must be 10MB or smaller.")
+      return
+    }
+
+    if (reviewImagePreview) URL.revokeObjectURL(reviewImagePreview)
+    setReviewImageFile(file)
+    setReviewImagePreview(URL.createObjectURL(file))
+  }
+
+  const submitReview = async (event) => {
+    event.preventDefault()
+    setFormStatus("")
+    setFormError("")
+
+    const userId = await getCurrentUserId()
+
+    if (!userId) {
+      setFormError("Please log in to submit a review.")
+      return
+    }
+
+    const payload = {
+      product_id: productId,
+      product_name: productName,
+      reviewer_first_name: form.reviewer_first_name.trim(),
+      place: form.place.trim(),
+      rating: Number(form.rating),
+      review_text: form.review_text.trim(),
+      is_approved: false,
+      source: "customer",
+    }
+
+    if (!payload.reviewer_first_name || !payload.place || !payload.review_text) {
+      setFormError("Please fill every field before submitting your review.")
+      return
+    }
+
+    setIsSubmitting(true)
+    let uploadedImagePath = ""
+    try {
+      const uploadedImage = reviewImageFile
+        ? await uploadReviewImage({ file: reviewImageFile, userId })
+        : null
+
+      uploadedImagePath = uploadedImage?.path || ""
+      payload.review_image_url = uploadedImage?.publicUrl || null
+
+      const { error } = await withRequestTimeout(supabase.from("reviews").insert(payload))
+      if (error) throw error
+
+      setForm(createBlankReviewForm())
+      clearReviewImage()
+      setFormStatus("Thank you. Your review is waiting for approval.")
+    } catch (error) {
+      if (uploadedImagePath) {
+        try {
+          await deleteReviewImage(uploadedImagePath)
+        } catch (cleanupError) {
+          console.error("Review image cleanup error:", cleanupError)
+        }
+      }
+      console.error("Product review submit error:", error)
+      setFormError("We could not submit your review right now. Please try again.")
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  return (
+    <section className="product-reviews" aria-label={`${productName} reviews`}>
+      <div className="product-reviews-heading">
+        <div>
+          <small>Customer reviews</small>
+          <h2>What people say about {productName}</h2>
+        </div>
+        <div className="product-review-score">
+          <strong>{reviews.length ? averageRating.toFixed(1) : "0.0"}</strong>
+          <StarRating rating={Math.round(averageRating)} />
+          <span>{reviews.length} review{reviews.length === 1 ? "" : "s"}</span>
+        </div>
+      </div>
+
+      {loading && <p className="product-review-status">Loading reviews...</p>}
+      {!loading && errorMessage && <p className="product-review-status">{errorMessage}</p>}
+      {!loading && !errorMessage && reviews.length === 0 && (
+        <p className="product-review-status">No reviews yet. Be the first to share your experience.</p>
+      )}
+      {!loading && !errorMessage && reviews.length > 0 && (
+        <div className="product-review-list">
+          {reviews.map((review) => (
+            <article className="product-review-card" key={review.id}>
+              <header>
+                <div className="product-review-avatar" aria-hidden="true">{review.reviewer_first_name?.charAt(0) || "P"}</div>
+                <div><strong>{review.reviewer_first_name}</strong><span>{review.place}</span></div>
+                <time>{formatReviewDate(review.review_date)}</time>
+              </header>
+              <StarRating rating={review.rating} />
+              <p>{review.review_text}</p>
+              {review.review_image_url && <img className="product-review-image" src={review.review_image_url} alt={`Photo shared by ${review.reviewer_first_name}`} loading="lazy" />}
+              {review.admin_reply_text && (
+                <aside className="product-review-reply">
+                  <strong>Puchi Puchi</strong>
+                  <p>{review.admin_reply_text}</p>
+                </aside>
+              )}
+            </article>
+          ))}
+        </div>
+      )}
+
+      <form className="product-review-form" onSubmit={submitReview}>
+        <h3>Leave a review</h3>
+        <div className="product-review-form-grid">
+          <label>First name<input type="text" value={form.reviewer_first_name} onChange={(event) => handleFormChange("reviewer_first_name", event.target.value.slice(0, 40))} maxLength={40} required /></label>
+          <label>Place<input type="text" value={form.place} onChange={(event) => handleFormChange("place", event.target.value.slice(0, 80))} maxLength={80} required /></label>
+          <label>Rating<select value={form.rating} onChange={(event) => handleFormChange("rating", event.target.value)}>{[5, 4, 3, 2, 1].map((rating) => <option value={rating} key={rating}>{rating} star{rating === 1 ? "" : "s"}</option>)}</select></label>
+          <label className="product-review-form-wide">Review<textarea value={form.review_text} onChange={(event) => handleFormChange("review_text", event.target.value.slice(0, 1000))} maxLength={1000} rows={5} required /></label>
+          <label className="product-review-form-wide product-review-image-upload">
+            Add a photo (optional)
+            <input ref={reviewImageInputRef} type="file" accept="image/*" onChange={handleReviewImageChange} />
+            <small>Any uploaded photo is converted to WebP. Maximum 10MB.</small>
+          </label>
+          {reviewImagePreview && (
+            <div className="product-review-image-preview">
+              <img src={reviewImagePreview} alt="Review upload preview" />
+              <div><strong>{reviewImageFile?.name}</strong><span>Will be saved as WebP</span></div>
+              <button type="button" onClick={clearReviewImage} aria-label="Remove review image"><LuX /></button>
+            </div>
+          )}
+        </div>
+        {formError && <p className="product-review-message error">{formError}</p>}
+        {formStatus && <p className="product-review-message">{formStatus}</p>}
+        <button type="submit" className="primary product-review-submit" disabled={isSubmitting}><LuSend /> {isSubmitting ? "Submitting..." : "Submit Review"}</button>
+      </form>
+    </section>
+  )
 }
 
 function ProductDetails() {
@@ -37,6 +280,7 @@ function ProductDetails() {
   const [customImagePreview, setCustomImagePreview] = useState("")
   const [customNameOption, setCustomNameOption] = useState("none")
   const [customBaseText, setCustomBaseText] = useState("")
+  const [includeProductBox, setIncludeProductBox] = useState(false)
 
   useEffect(() => {
     let isCurrent = true
@@ -114,6 +358,7 @@ function ProductDetails() {
     setCustomImagePreview("")
     setCustomNameOption("none")
     setCustomBaseText("")
+    setIncludeProductBox(false)
   }, [product])
 
   useEffect(() => {
@@ -191,14 +436,15 @@ function ProductDetails() {
   const price = variant?.discount_price || variant?.price || 0
   const canAddName = product.allow_custom_name === true
   const canAddNamePlate = product.allow_name_plate === true
-  const hasNameOptions = canAddName || canAddNamePlate
+  const canAddProductBox = product.allow_product_box === true
+  const hasNameOptions = canAddName || canAddNamePlate || canAddProductBox
   const selectedNameOption = customNameOption === "name_plate" && canAddNamePlate
     ? "name_plate"
     : customNameOption === "name" && canAddName
       ? "name"
       : "none"
-  const customBaseFee = selectedNameOption === "name_plate" ? CUSTOM_BASE_FEE : 0
-  const displayPrice = price + customBaseFee
+  const customNameFee = selectedNameOption === "name_plate" ? CUSTOM_BASE_FEE : 0
+  const displayPrice = price + customNameFee + (includeProductBox ? GIFT_BOX_FEE : 0)
   const formattedPrice = formatCartPrice(displayPrice)
   const variantImages = parseListField(variant?.image_urls || variant?.image_url)
   const image = variantImages[selectedImageIndex] || variantImages[0] || PRODUCT_PLACEHOLDER_IMAGE
@@ -263,8 +509,9 @@ function ProductDetails() {
         price,
         customImageUrl,
         customBaseText: selectedNameOption !== "none" ? customBaseText : "",
-        customBaseFee,
+        customBaseFee: customNameFee,
         customTextType: selectedNameOption === "name_plate" ? "name_plate" : "name",
+        addProductBox: includeProductBox,
       })
 
       setCartMessage("Added to cart.")
@@ -484,7 +731,7 @@ function ProductDetails() {
 
                 {hasNameOptions && (
                   <div className="custom-name-options">
-                    <h6>Personalization</h6>
+                    <h6>Personalization & product box</h6>
 
                     {canAddNamePlate && (
                       <label className={`custom-base-option ${selectedNameOption === "name_plate" ? "selected" : ""}`}>
@@ -541,6 +788,24 @@ function ProductDetails() {
                         <small>Keep it simple</small>
                       </span>
                     </label>
+
+                    {canAddProductBox && (
+                      <label className={`custom-base-option ${includeProductBox ? "selected" : ""}`}>
+                        <input
+                          type="checkbox"
+                          checked={includeProductBox}
+                          onChange={(event) => {
+                            setIncludeProductBox(event.target.checked)
+                            setCartMessage("")
+                            setCartError("")
+                          }}
+                        />
+                        <span>
+                          <strong>Add product box</strong>
+                          <small>+{formatCartPrice(GIFT_BOX_FEE)}</small>
+                        </span>
+                      </label>
+                    )}
                   </div>
                 )}
 
@@ -605,6 +870,8 @@ function ProductDetails() {
             )}
           </div>
         </div>
+
+        <ProductReviews productId={product.id} productName={product.name} />
 
         {relatedProducts.length > 0 && (
           <div className="related-products">

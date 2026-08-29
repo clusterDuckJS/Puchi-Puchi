@@ -35,6 +35,7 @@ import {
   getOrderDueDate,
   getOrderTrackingCarrier,
   isMissingOrderNumberError,
+  isMissingOrderTrackingDetailsError,
   normalizeOrderStatus,
   ORDER_STAGE_OPTIONS,
   ORDER_TRACKING_CARRIERS,
@@ -42,6 +43,7 @@ import {
 import { supabase } from "../../utils/supabase";
 import { isTimeoutError, withRequestTimeout } from "../../utils/request";
 import { sanitizeRichText, stripRichText } from "../../utils/richText";
+import { convertImageToWebp } from "../../utils/images";
 import "./admin.css";
 
 const currency = new Intl.NumberFormat("en-IN", {
@@ -181,13 +183,14 @@ const getSiteAssetUploadErrorMessage = (error) => {
 };
 
 const uploadSiteAssetImage = async (file, folder) => {
-  const { contentType, extension } = getSiteAssetFileInfo(file);
-  const filePath = `${folder}/${createStorageAssetName(extension)}`;
+  getSiteAssetFileInfo(file);
+  const webpFile = await convertImageToWebp(file);
+  const filePath = `${folder}/${createStorageAssetName("webp")}`;
   const { error } = await supabase.storage
     .from(SITE_ASSETS_BUCKET)
-    .upload(filePath, file, {
+    .upload(filePath, webpFile, {
       cacheControl: "31536000",
-      contentType,
+      contentType: "image/webp",
       upsert: false,
     });
 
@@ -237,6 +240,7 @@ const createBlankProductForm = () => ({
   is_new_arrival: false,
   allow_custom_name: false,
   allow_name_plate: false,
+  allow_product_box: false,
   variants: [createBlankVariant()],
 });
 
@@ -313,9 +317,10 @@ const editorActions = [
   { command: "numberedList", label: "Numbered list", icon: LuListOrdered, listTagName: "ol" },
 ];
 
-function RichTextEditor({ id, value, onChange }) {
+function RichTextEditor({ id, value, onChange, onImageUpload, isImageUploading = false }) {
   const editorRef = useRef(null);
   const selectionRef = useRef(null);
+  const imageInputRef = useRef(null);
 
   const rememberSelection = useCallback(() => {
     const selection = window.getSelection();
@@ -482,6 +487,43 @@ function RichTextEditor({ id, value, onChange }) {
     syncValue();
   };
 
+  const insertImage = (source) => {
+    if (!source || !ensureSelectionInEditor()) return;
+
+    const selection = window.getSelection();
+    const range = selection?.rangeCount ? selection.getRangeAt(0) : selectionRef.current;
+
+    if (!range) return;
+
+    const image = document.createElement("img");
+    image.src = source;
+    image.alt = "Product description";
+    range.deleteContents();
+    range.insertNode(image);
+
+    const nextRange = document.createRange();
+    nextRange.setStartAfter(image);
+    nextRange.collapse(true);
+    selection?.removeAllRanges();
+    selection?.addRange(nextRange);
+    selectionRef.current = nextRange;
+    syncSanitizedValue();
+  };
+
+  const handleImageChange = async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+
+    if (!file || !onImageUpload) return;
+
+    try {
+      const source = await onImageUpload(file);
+      insertImage(source);
+    } catch {
+      // The parent surfaces upload errors alongside the product form.
+    }
+  };
+
   return (
     <div className="admin-rich-text">
       <div className="admin-rich-text-toolbar" aria-label="Description formatting">
@@ -500,6 +542,30 @@ function RichTextEditor({ id, value, onChange }) {
             {createElement(action.icon)}
           </button>
         ))}
+        {onImageUpload && (
+          <>
+            <button
+              type="button"
+              onMouseDown={(event) => {
+                event.preventDefault();
+                rememberSelection();
+              }}
+              onClick={() => imageInputRef.current?.click()}
+              disabled={isImageUploading}
+              aria-label="Add description image"
+              title="Add description image"
+            >
+              <LuImagePlus />
+            </button>
+            <input
+              ref={imageInputRef}
+              type="file"
+              accept={SITE_ASSET_IMAGE_ACCEPT}
+              onChange={handleImageChange}
+              hidden
+            />
+          </>
+        )}
       </div>
       <div
         id={id}
@@ -792,7 +858,7 @@ function OrdersPage() {
     setError("");
 
     try {
-      const createOrdersRequest = (includeOrderNumber) => supabase
+      const createOrdersRequest = ({ includeOrderNumber, includeTrackingDetails }) => supabase
         .from("orders")
         .select(`
           id,
@@ -802,8 +868,7 @@ function OrdersPage() {
           status,
           paid_at,
           tracking_id,
-          tracking_notes,
-          tracking_carrier,
+          ${includeTrackingDetails ? "tracking_notes, tracking_carrier," : ""}
           dispatched_at,
           selected_address_id,
           delivery_address,
@@ -838,6 +903,7 @@ function OrdersPage() {
               base_text,
               base_fee,
               custom_text_type,
+              product_box,
               status,
               notes
             )
@@ -846,10 +912,29 @@ function OrdersPage() {
         .neq("status", "pending")
         .order("created_at", { ascending: false });
 
-      let ordersResult = await withRequestTimeout(createOrdersRequest(true));
+      let includeOrderNumber = true;
+      let includeTrackingDetails = true;
+      let ordersResult = null;
 
-      if (ordersResult.error && isMissingOrderNumberError(ordersResult.error)) {
-        ordersResult = await withRequestTimeout(createOrdersRequest(false));
+      for (let attempt = 0; attempt < 3; attempt += 1) {
+        ordersResult = await withRequestTimeout(createOrdersRequest({
+          includeOrderNumber,
+          includeTrackingDetails,
+        }));
+
+        if (!ordersResult.error) break;
+
+        if (includeOrderNumber && isMissingOrderNumberError(ordersResult.error)) {
+          includeOrderNumber = false;
+          continue;
+        }
+
+        if (includeTrackingDetails && isMissingOrderTrackingDetailsError(ordersResult.error)) {
+          includeTrackingDetails = false;
+          continue;
+        }
+
+        break;
       }
 
       const { data, error: ordersError } = ordersResult;
@@ -895,6 +980,49 @@ function OrdersPage() {
 
   useEffect(() => {
     fetchOrders();
+  }, [fetchOrders]);
+
+  useEffect(() => {
+    const channel = supabase
+      .channel("admin-orders")
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "orders",
+        },
+        () => {
+          fetchOrders();
+        },
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "order_items",
+        },
+        () => {
+          fetchOrders();
+        },
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "custom_uploads",
+        },
+        () => {
+          fetchOrders();
+        },
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [fetchOrders]);
 
   const updateOrderStatus = async (orderId, status) => {
@@ -1139,9 +1267,10 @@ function OrdersPage() {
                             {customUpload?.base_text && (
                               <em>
                                 {customUpload.custom_text_type === "name_plate" ? "Name plate" : "Name"}: {customUpload.base_text}
-                                {customUpload.base_fee ? ` (+${currency.format(customUpload.base_fee / 100)})` : ""}
+                                {customUpload.base_fee - (customUpload.product_box ? 15000 : 0) ? ` (+${currency.format((customUpload.base_fee - (customUpload.product_box ? 15000 : 0)) / 100)})` : ""}
                               </em>
                             )}
+                            {customUpload?.product_box && <em>Product box (+{currency.format(150)})</em>}
                             {customUpload?.image_url && (
                               <a href={customUpload.image_url} target="_blank" rel="noreferrer">
                                 View custom pic
@@ -1496,6 +1625,7 @@ function AdminReviewsPage() {
     const payload = {
       reviewer_first_name: form.reviewer_first_name.trim(),
       place: form.place.trim(),
+      product_id: selectedReviewProduct?.id || null,
       product_name: form.product_name.trim(),
       rating: Number(form.rating),
       review_text: form.review_text.trim(),
@@ -1661,13 +1791,13 @@ function AdminReviewsPage() {
     <>
       <PageHeader
         title="Reviews"
-        description="Approve customer submissions and add older reviews from before the website."
+        description="Approve customer submissions and add your own reviews with any name and date."
         action={<SearchField placeholder="Search reviews..." value={query} onChange={setQuery} />}
       />
 
       <div className="admin-reviews-layout">
         <form className="admin-review-form admin-panel" onSubmit={saveReview}>
-          <h2>Add Past Review</h2>
+          <h2>Add a Review</h2>
           <div className="admin-form-grid">
             <label>
               First name
@@ -1777,7 +1907,7 @@ function AdminReviewsPage() {
                 checked={form.is_approved}
                 onChange={(event) => handleFormChange("is_approved", event.target.checked)}
               />
-              <span>Show on reviews page immediately</span>
+              <span>Show on the product page immediately</span>
             </label>
           </div>
           {message && <p className="admin-form-success">{message}</p>}
@@ -1805,6 +1935,11 @@ function AdminReviewsPage() {
                     <em>{review.rating}/5</em>
                   </header>
                   <p>{review.review_text}</p>
+                  {review.review_image_url && (
+                    <a className="admin-review-image" href={review.review_image_url} target="_blank" rel="noreferrer">
+                      <img src={review.review_image_url} alt={`Photo shared by ${review.reviewer_first_name}`} loading="lazy" />
+                    </a>
+                  )}
                   <section className="admin-review-reply" aria-label={`Reply to ${review.reviewer_first_name}'s review`}>
                     <div className="admin-review-reply-heading">
                       <strong>Reply as {ADMIN_REVIEW_REPLY_NAME}</strong>
@@ -1864,6 +1999,7 @@ function ProductFormModal({
   onCustomCategoryChange,
   onAddCustomCategory,
   onRemoveCategory,
+  onDescriptionImageUpload,
   onVariantChange,
   onVariantImageChange,
   onVariantImageUpload,
@@ -1968,6 +2104,8 @@ function ProductFormModal({
               id="productDescription"
               value={form.description}
               onChange={(value) => onProductChange("description", value)}
+              onImageUpload={onDescriptionImageUpload}
+              isImageUploading={uploadingImageKey === "description"}
             />
           </fieldset>
         </div>
@@ -2000,6 +2138,7 @@ function ProductFormModal({
             {[
               ["allow_name_plate", "Add name plate (+100)"],
               ["allow_custom_name", "Add name (no extra cost)"],
+              ["allow_product_box", "Add product box (+150)"],
             ].map(([key, label]) => (
               <label className="admin-check" key={key}>
                 <input
@@ -2151,7 +2290,7 @@ function ProductFormModal({
                       );
                     })}
                   </div>
-                  <small className="admin-field-help">Choose images from your computer or paste URLs. The first image is used as the main storefront image.</small>
+                  <small className="admin-field-help">Uploaded images are converted to WebP. You can also paste a URL. The first image is used as the main storefront image.</small>
                 </fieldset>
 
                 <label className="admin-check admin-variant-active">
@@ -2297,6 +2436,7 @@ function ProductsPage() {
       is_new_arrival: product.is_new_arrival ?? false,
       allow_custom_name: product.allow_custom_name ?? false,
       allow_name_plate: product.allow_name_plate ?? false,
+      allow_product_box: product.allow_product_box ?? false,
       variants,
     });
     setEditingProduct(product);
@@ -2396,6 +2536,24 @@ function ProductsPage() {
     }
   };
 
+  const uploadDescriptionImage = async (file) => {
+    if (!file) return "";
+
+    setFormError("");
+    setUploadingImageKey("description");
+
+    try {
+      const { publicUrl } = await uploadSiteAssetImage(file, PRODUCT_ASSETS_FOLDER);
+      return publicUrl;
+    } catch (error) {
+      console.error("Product description image upload error:", error);
+      setFormError(error.message || "We could not upload that description image.");
+      throw error;
+    } finally {
+      setUploadingImageKey("");
+    }
+  };
+
   const addVariantImage = (variantIndex) => {
     setForm((current) => ({
       ...current,
@@ -2486,6 +2644,7 @@ function ProductsPage() {
       is_new_arrival: form.is_new_arrival,
       allow_custom_name: form.allow_custom_name,
       allow_name_plate: form.allow_name_plate,
+      allow_product_box: form.allow_product_box,
     };
 
     const productRequest = editingProduct
@@ -2676,6 +2835,7 @@ function ProductsPage() {
           onCustomCategoryChange={(value) => handleProductChange("customCategory", value)}
           onAddCustomCategory={addCustomCategory}
           onRemoveCategory={removeCategory}
+          onDescriptionImageUpload={uploadDescriptionImage}
           onVariantChange={handleVariantChange}
           onVariantImageChange={handleVariantImageChange}
           onVariantImageUpload={uploadVariantImage}
@@ -2771,8 +2931,8 @@ function GalleryAdminPage() {
       await fetchGalleryImages();
       setSuccessMessage(
         files.length === 1
-          ? "Gallery image uploaded."
-          : `${files.length} gallery images uploaded.`
+          ? "Gallery image uploaded as WebP."
+          : `${files.length} gallery images uploaded as WebP.`
       );
     } catch (error) {
       console.error("Gallery image upload error:", error);
@@ -2811,7 +2971,7 @@ function GalleryAdminPage() {
     <>
       <PageHeader
         title="Gallery"
-        description="Upload and manage the images shown on the public gallery page."
+        description="Upload and manage the images shown on the public gallery page. Uploaded images are saved as WebP."
         action={
           <label className={`admin-gallery-upload ${uploading ? "is-disabled" : ""}`}>
             <input

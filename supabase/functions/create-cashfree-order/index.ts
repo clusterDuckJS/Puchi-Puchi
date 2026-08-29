@@ -60,6 +60,8 @@ serve(async (request) => {
   const cashfreeApiVersion = Deno.env.get("CASHFREE_API_VERSION") || "2025-01-01"
   const cashfreeBaseUrl = Deno.env.get("CASHFREE_BASE_URL") || "https://api.cashfree.com/pg"
   const siteUrl = Deno.env.get("SITE_URL") || request.headers.get("origin")
+  const cashfreeWebhookUrl = Deno.env.get("CASHFREE_WEBHOOK_URL") ||
+    `${supabaseUrl?.replace(/\/$/, "")}/functions/v1/cashfree-webhook`
 
   if (!supabaseUrl || !supabaseAnonKey || !supabaseServiceRoleKey) {
     return jsonResponse({ error: "Supabase function secrets are missing." }, 500)
@@ -244,6 +246,7 @@ serve(async (request) => {
     },
     order_meta: {
       return_url: `${siteUrl.replace(/\/$/, "")}/payment-status?order_id={order_id}`,
+      notify_url: cashfreeWebhookUrl,
     },
     order_note: "Puchi Puchi cart checkout",
     order_tags: {
@@ -280,7 +283,11 @@ serve(async (request) => {
     )
   }
 
-  await serviceClient
+  if (!cashfreeData.order_id || !cashfreeData.payment_session_id) {
+    return jsonResponse({ error: "Cashfree did not return a complete checkout session." }, 502)
+  }
+
+  const { error: checkoutDetailsError } = await serviceClient
     .from("orders")
     .update({
       customer_name: customerName || null,
@@ -306,8 +313,19 @@ serve(async (request) => {
       insurance_amount: insurance,
       crafting_speed: craftingSpeed,
       crafting_speed_fee: craftingSpeedFee,
+      cashfree_order_id: cashfreeData.order_id,
+      cashfree_payment_status: "ACTIVE",
+      checkout_started_at: new Date().toISOString(),
     })
     .eq("id", order.id)
+
+  if (checkoutDetailsError) {
+    console.error("Checkout detail save error:", checkoutDetailsError)
+
+    return jsonResponse({
+      error: "We could not save your checkout details. Please try again before payment.",
+    }, 500)
+  }
 
   return jsonResponse({
     order_id: cashfreeData.order_id,

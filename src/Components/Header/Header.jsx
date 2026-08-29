@@ -201,9 +201,6 @@ function Header({ profile, user }) {
             <NavLink to="/about" className="nav-link" onClick={closeMobileMenu}>
               About
             </NavLink>
-            <NavLink to="/reviews" className="nav-link" onClick={closeMobileMenu}>
-              Reviews
-            </NavLink>
             <NavLink to="/faq" className="nav-link" onClick={closeMobileMenu}>
               FAQ
             </NavLink>

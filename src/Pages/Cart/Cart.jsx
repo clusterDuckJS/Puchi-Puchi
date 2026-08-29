@@ -307,9 +307,10 @@ function Cart() {
                           {customUpload?.base_text && (
                             <span className="cart-custom-base">
                               {customUpload.custom_text_type === "name_plate" ? "Name plate" : "Name"}: {customUpload.base_text}
-                              {customUpload.base_fee ? ` (+${formatCartPrice(customUpload.base_fee)})` : ""}
+                              {customUpload.base_fee - (customUpload.product_box ? 15000 : 0) ? ` (+${formatCartPrice(customUpload.base_fee - (customUpload.product_box ? 15000 : 0))})` : ""}
                             </span>
                           )}
+                          {customUpload?.product_box && <span className="cart-custom-base">Product box (+{formatCartPrice(15000)})</span>}
                           <p>{formatCartPrice(item.price)}</p>
 
                           <div className="cart-quantity-stepper" aria-label="Quantity selector">
@@ -428,6 +429,8 @@ function Cart() {
                               {key === "standard" && (
                                 <small className="cart-free-note">
                                   Free on cart items above {formatCartPrice(FREE_STANDARD_SHIPPING_THRESHOLD)}
+                                  <br />
+                                  (name plates and product boxes count; checkout services do not)
                                 </small>
                               )}
                             </span>

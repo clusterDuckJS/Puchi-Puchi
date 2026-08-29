@@ -63,26 +63,57 @@ serve(async (request) => {
 
   const supabaseOrderId = cashfreeData.order_tags?.supabase_order_id
   const orderStatus = cashfreeData.order_status
+  const syncWarnings: string[] = []
 
   if (supabaseOrderId && orderStatus === "PAID") {
     const serviceClient = createClient(supabaseUrl, supabaseServiceRoleKey)
-    await serviceClient
+    const { data: updatedOrder, error: updateError } = await serviceClient
       .from("orders")
       .update({ status: "paid", paid_at: new Date().toISOString() })
       .eq("id", supabaseOrderId)
+      .select("id")
+      .maybeSingle()
 
-    await serviceClient.rpc("assign_order_number", {
+    if (updateError) {
+      console.error("Paid order update error:", updateError)
+
+      return jsonResponse({
+        error: "Payment was received, but we could not confirm the local order. Please contact Puchi Puchi support.",
+      }, 500)
+    }
+
+    if (!updatedOrder) {
+      console.error("Paid order update missed local order:", supabaseOrderId)
+
+      return jsonResponse({
+        error: "Payment was received, but we could not find the matching local order. Please contact Puchi Puchi support.",
+      }, 500)
+    }
+
+    const { error: orderNumberError } = await serviceClient.rpc("assign_order_number", {
       target_order_id: supabaseOrderId,
     })
 
-    await serviceClient.rpc("deduct_order_stock", {
+    if (orderNumberError) {
+      console.error("Order number assignment error:", orderNumberError)
+      syncWarnings.push("order_number")
+    }
+
+    const { error: stockError } = await serviceClient.rpc("deduct_order_stock", {
       target_order_id: supabaseOrderId,
     })
+
+    if (stockError) {
+      console.error("Order stock deduction error:", stockError)
+      syncWarnings.push("stock")
+    }
   }
 
   return jsonResponse({
     order_id: cashfreeData.order_id,
     order_status: orderStatus,
     order_amount: cashfreeData.order_amount,
+    supabase_order_id: supabaseOrderId || null,
+    sync_warnings: syncWarnings,
   })
 })

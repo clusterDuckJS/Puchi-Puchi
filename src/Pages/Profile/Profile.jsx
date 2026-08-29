@@ -194,12 +194,13 @@ function OrdersTab({ orders, loading, error }) {
                           View uploaded reference
                         </a>
                       )}
-                      {customUpload?.base_text && (
-                        <small>
-                          {customUpload.custom_text_type === "name_plate" ? "Name plate" : "Name"}: {customUpload.base_text}
-                          {customUpload.base_fee ? ` (+${formatCartPrice(customUpload.base_fee)})` : ""}
-                        </small>
-                      )}
+                          {customUpload?.base_text && (
+                            <small>
+                              {customUpload.custom_text_type === "name_plate" ? "Name plate" : "Name"}: {customUpload.base_text}
+                              {customUpload.base_fee - (customUpload.product_box ? 15000 : 0) ? ` (+${formatCartPrice(customUpload.base_fee - (customUpload.product_box ? 15000 : 0))})` : ""}
+                            </small>
+                          )}
+                          {customUpload?.product_box && <small>Product box (+{formatCartPrice(15000)})</small>}
                       {(customUploadStatus || customUploadNotes) && (
                         <div className="profile-custom-update">
                           {customUploadStatus && <strong>Custom request: {customUploadStatus}</strong>}
@@ -498,6 +499,7 @@ function Profile({ user, profile, onProfileUpdated }) {
               base_text,
               base_fee,
               custom_text_type,
+              product_box,
               status,
               notes
             )
