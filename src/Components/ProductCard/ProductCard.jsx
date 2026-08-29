@@ -12,10 +12,11 @@ const parseListField = (value) => {
 const getVariantDisplayPrice = (variant) => {
   const discountPrice = Number(variant.discount_price)
   const price = Number(variant.price)
+  const availablePrices = [price, discountPrice].filter((value) => (
+    Number.isFinite(value) && value > 0
+  ))
 
-  if (Number.isFinite(discountPrice) && discountPrice > 0) return discountPrice
-  if (Number.isFinite(price) && price > 0) return price
-  return null
+  return availablePrices.length ? Math.min(...availablePrices) : null
 }
 
 const getLowestVariantPrice = (variants) => {
@@ -29,6 +30,7 @@ const getLowestVariantPrice = (variants) => {
 
 function ProductCard({ product, onClick }) {
   const variants = product.product_variants || []
+  const activeVariants = variants.filter((variant) => variant.is_active !== false)
   const minPrice = getLowestVariantPrice(variants)
   const formattedPrice = `\u20b9${(minPrice / 100).toLocaleString("en-IN")}`
   const categories = parseListField(product.categories || product.category)
@@ -59,7 +61,7 @@ function ProductCard({ product, onClick }) {
       </h6>
 
       <h5 className="text-primary bold-700">
-        {formattedPrice}
+        {activeVariants.length > 1 ? `From ${formattedPrice}` : formattedPrice}
       </h5>
 
       {product.id ? (

@@ -176,7 +176,7 @@ function ProductReviews({ productId, productName }) {
 
       setForm(createBlankReviewForm())
       clearReviewImage()
-      setFormStatus("Thank you. Your review is waiting for approval.")
+      setFormStatus("Thank you. Your review has been submitted.")
     } catch (error) {
       if (uploadedImagePath) {
         try {
