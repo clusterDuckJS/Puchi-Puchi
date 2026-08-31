@@ -901,6 +901,7 @@ function OrdersPage() {
             custom_uploads (
               id,
               image_url,
+              whatsapp_number,
               base_text,
               base_fee,
               custom_text_type,
@@ -1277,6 +1278,7 @@ function OrdersPage() {
                                 View custom pic
                               </a>
                             )}
+                            {customUpload?.whatsapp_number && <em>WhatsApp preview: {customUpload.whatsapp_number}</em>}
                           </div>
                         );
                       })}

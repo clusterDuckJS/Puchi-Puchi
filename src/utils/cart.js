@@ -143,6 +143,7 @@ export const addItemToCart = async ({
   quantity,
   price,
   customImageUrl,
+  whatsappNumber = "",
   customBaseText = "",
   customBaseFee = 0,
   customTextType = null,
@@ -166,6 +167,7 @@ export const addItemToCart = async ({
   })
 
   const hasCustomUpload = Boolean(customImageUrl)
+  const normalizedWhatsAppNumber = whatsappNumber.trim().slice(0, 32)
   const normalizedBaseText = customBaseText.trim().slice(0, 40)
   const baseFee = (normalizedBaseText ? Number(customBaseFee) || 0 : 0) + (addProductBox ? GIFT_BOX_FEE : 0)
   const normalizedTextType = normalizedBaseText && customTextType === "name_plate" ? "name_plate" : (normalizedBaseText ? "name" : null)
@@ -220,12 +222,13 @@ export const addItemToCart = async ({
     cartItem = data
   }
 
-  if (hasCustomUpload || normalizedBaseText || addProductBox) {
+  if (hasCustomUpload || normalizedWhatsAppNumber || normalizedBaseText || addProductBox) {
     const { error } = await supabase
       .from("custom_uploads")
       .insert({
         order_item_id: cartItem.id,
         image_url: customImageUrl || null,
+        whatsapp_number: normalizedWhatsAppNumber || null,
         base_text: normalizedBaseText || null,
         base_fee: baseFee,
         custom_text_type: normalizedTextType,
@@ -330,6 +333,7 @@ export const fetchCart = async (userId) => {
       custom_uploads (
         id,
         image_url,
+        whatsapp_number,
         base_text,
         base_fee,
         custom_text_type,

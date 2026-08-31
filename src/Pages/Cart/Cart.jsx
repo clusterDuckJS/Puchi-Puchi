@@ -304,6 +304,9 @@ function Cart() {
                               View uploaded reference
                             </a>
                           )}
+                          {customUpload?.whatsapp_number && (
+                            <span className="cart-custom-base">WhatsApp preview: {customUpload.whatsapp_number}</span>
+                          )}
                           {customUpload?.base_text && (
                             <span className="cart-custom-base">
                               {customUpload.custom_text_type === "name_plate" ? "Name plate" : "Name"}: {customUpload.base_text}

@@ -6,9 +6,7 @@ function Hero() {
   const navigate = useNavigate()
 
   const handleCustomChibiClick = () => {
-    document.getElementById("custom-chibi")?.scrollIntoView({
-      behavior: "smooth",
-    })
+    window.location.assign("https://puchipuchi.in/product/personalized-funko-pop-single")
   }
 
   return (

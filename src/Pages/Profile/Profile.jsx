@@ -194,6 +194,7 @@ function OrdersTab({ orders, loading, error }) {
                           View uploaded reference
                         </a>
                       )}
+                      {customUpload?.whatsapp_number && <small>WhatsApp preview: {customUpload.whatsapp_number}</small>}
                           {customUpload?.base_text && (
                             <small>
                               {customUpload.custom_text_type === "name_plate" ? "Name plate" : "Name"}: {customUpload.base_text}
@@ -496,6 +497,7 @@ function Profile({ user, profile, onProfileUpdated }) {
             custom_uploads (
               id,
               image_url,
+              whatsapp_number,
               base_text,
               base_fee,
               custom_text_type,

@@ -20,6 +20,22 @@ const parseListField = (value) => {
   return String(value).split(',').map((item) => item.trim()).filter(Boolean)
 }
 
+const getVariantPrice = (variant) => {
+  const discountPrice = Number(variant?.discount_price)
+  if (Number.isFinite(discountPrice) && discountPrice > 0) return discountPrice
+
+  const regularPrice = Number(variant?.price)
+  return Number.isFinite(regularPrice) && regularPrice >= 0
+    ? regularPrice
+    : Number.POSITIVE_INFINITY
+}
+
+const getLowestPricedVariant = (variants) => variants.reduce((lowestVariant, variant) => (
+  !lowestVariant || getVariantPrice(variant) < getVariantPrice(lowestVariant)
+    ? variant
+    : lowestVariant
+), null)
+
 const createBlankReviewForm = () => ({
   reviewer_first_name: "",
   place: "",
@@ -279,6 +295,7 @@ function ProductDetails() {
   const [cartError, setCartError] = useState("")
   const [customImageFile, setCustomImageFile] = useState(null)
   const [customImagePreview, setCustomImagePreview] = useState("")
+  const [whatsAppNumber, setWhatsAppNumber] = useState("")
   const [customNameOption, setCustomNameOption] = useState("none")
   const [customBaseText, setCustomBaseText] = useState("")
   const [includeProductBox, setIncludeProductBox] = useState(false)
@@ -364,14 +381,16 @@ function ProductDetails() {
 
   useEffect(() => {
     const variants = product?.product_variants || []
-    const firstAvailableVariant = variants.find((variant) => variant.is_active !== false) || variants[0]
+    const activeVariants = variants.filter((variant) => variant.is_active !== false)
+    const lowestPricedVariant = getLowestPricedVariant(activeVariants) || getLowestPricedVariant(variants)
 
-    setSelectedVariantId(firstAvailableVariant?.id || null)
+    setSelectedVariantId(lowestPricedVariant?.id || null)
     setSelectedImageIndex(0)
     setVariantSearch("")
     setQuantity(1)
     setCustomImageFile(null)
     setCustomImagePreview("")
+    setWhatsAppNumber("")
     setCustomNameOption("none")
     setCustomBaseText("")
     setIncludeProductBox(false)
@@ -448,7 +467,8 @@ function ProductDetails() {
       return searchableText.includes(variantSearchTerm)
     })
     : variants
-  const variant = variants.find((item) => item.id === selectedVariantId) || variants[0] || product.product_variants?.[0]
+  const defaultVariant = getLowestPricedVariant(variants) || getLowestPricedVariant(product.product_variants || [])
+  const variant = variants.find((item) => item.id === selectedVariantId) || defaultVariant
   const price = variant?.discount_price || variant?.price || 0
   const canAddName = product.allow_custom_name === true
   const canAddNamePlate = product.allow_name_plate === true
@@ -498,6 +518,12 @@ function ProductDetails() {
       return
     }
 
+    const whatsAppDigits = whatsAppNumber.replace(/\D/g, "")
+    if (isMadeJustForYou && (whatsAppDigits.length < 10 || whatsAppDigits.length > 15)) {
+      setCartError("Please enter a valid WhatsApp number so we can send your preview.")
+      return
+    }
+
     if (selectedNameOption !== "none" && !customBaseText.trim()) {
       setCartError("Please enter the name or text for this personalization.")
       return
@@ -524,6 +550,7 @@ function ProductDetails() {
         quantity,
         price,
         customImageUrl,
+        whatsappNumber: isMadeJustForYou ? whatsAppNumber : "",
         customBaseText: selectedNameOption !== "none" ? customBaseText : "",
         customBaseFee: customNameFee,
         customTextType: selectedNameOption === "name_plate" ? "name_plate" : "name",
@@ -533,6 +560,7 @@ function ProductDetails() {
       setCartMessage("Added to cart.")
       setCustomImageFile(null)
       setCustomImagePreview("")
+      setWhatsAppNumber("")
     } catch (error) {
       console.error("Add to cart error:", error)
       setCartError(error.message || "We could not add this item to your cart.")
@@ -545,6 +573,12 @@ function ProductDetails() {
     setCartMessage("")
     setCartError("")
     setCustomBaseText(event.target.value.slice(0, CUSTOM_BASE_TEXT_MAX_LENGTH))
+  }
+
+  const handleWhatsAppNumberChange = (event) => {
+    setCartMessage("")
+    setCartError("")
+    setWhatsAppNumber(event.target.value.slice(0, 32))
   }
 
   const handleCustomImageChange = (event) => {
@@ -742,6 +776,22 @@ function ProductDetails() {
                       accept="image/*"
                       onChange={handleCustomImageChange}
                     />
+
+                    <label className="custom-base-text custom-whatsapp-number" htmlFor="customWhatsAppNumber">
+                      <span>WhatsApp number for your preview</span>
+                      <input
+                        id="customWhatsAppNumber"
+                        type="tel"
+                        inputMode="tel"
+                        autoComplete="tel"
+                        value={whatsAppNumber}
+                        onChange={handleWhatsAppNumberChange}
+                        placeholder="e.g. +91 98765 43210"
+                        maxLength={32}
+                        required
+                      />
+                      <small>We’ll send your product preview here for approval before printing.</small>
+                    </label>
                   </>
                 )}
 
